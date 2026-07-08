@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>와이어프레임 · 일정표 화면 — AI 여행 플래너</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --primary:#00897B; --primary-dark:#00695C; --primary-light:#4DB6AC; --primary-contrast:#FFFFFF;
+    --secondary:#FF7043; --secondary-dark:#E64A19; --secondary-light:#FFA270; --secondary-contrast:#FFFFFF;
+    --bg-default:#FAFAFA; --bg-paper:#FFFFFF;
+    --text-primary:rgba(0,0,0,0.87); --text-secondary:rgba(0,0,0,0.6); --text-disabled:rgba(0,0,0,0.38);
+    --divider:rgba(0,0,0,0.12);
+    --warning:#ED6C02; --warning-bg:rgba(237,108,2,0.08);
+    --error:#D32F2F; --success:#2E7D32;
+    --shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+    --shadow-2:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Roboto','Helvetica Neue',Arial,sans-serif;background:var(--bg-default);color:var(--text-primary);}
+  .wf-banner{background:#212121;color:#fff;font-size:12px;padding:6px 16px;text-align:center;letter-spacing:.02em;}
+
+  .appbar{height:64px;background:var(--primary);color:var(--primary-contrast);display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-2);flex-wrap:wrap;gap:8px;}
+  .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;}
+  .appbar .brand .mark{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .appbar nav{display:flex;gap:4px;flex-wrap:wrap;}
+  .appbar nav a{color:rgba(255,255,255,.85);font-size:14px;font-weight:500;padding:10px 14px;border-radius:6px;text-decoration:none;cursor:pointer;}
+  .appbar nav a.active{color:#fff;background:rgba(255,255,255,.18);}
+  .appbar nav a:hover{background:rgba(255,255,255,.1);}
+
+  .trip-bar{background:var(--bg-paper);border-bottom:1px solid var(--divider);padding:18px 24px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;}
+  .trip-title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .trip-title{font-size:21px;font-weight:700;}
+  .trip-sub{font-size:13px;color:var(--text-secondary);margin-top:4px;}
+  .chip{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:14px;font-size:12px;font-weight:600;background:rgba(0,137,123,.12);color:var(--primary-dark);}
+  .trip-actions{display:flex;gap:10px;align-items:center;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:var(--radius);font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:inherit;}
+  .btn.outlined{background:transparent;border:1px solid rgba(0,137,123,.5);color:var(--primary-dark);}
+  .btn.outlined:hover{background:rgba(0,137,123,.06);}
+  .btn.secondary{background:var(--secondary);color:#fff;box-shadow:var(--shadow-1);}
+  .btn.secondary:hover{background:var(--secondary-dark);}
+  .btn.small{height:30px;padding:0 12px;font-size:12px;}
+  .btn:disabled{background:rgba(0,0,0,.12)!important;color:rgba(0,0,0,.26)!important;box-shadow:none;cursor:not-allowed;}
+  .revision-tag{font-size:12px;color:var(--secondary-dark);font-weight:600;}
+
+  .days-wrap{padding:20px 24px 60px;display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:18px;align-items:start;max-width:1200px;margin:0 auto;}
+  @media (max-width:980px){.days-wrap{grid-template-columns:repeat(2,minmax(260px,1fr));}}
+  @media (max-width:680px){.days-wrap{grid-template-columns:1fr;}.appbar,.trip-bar{padding:12px 16px;}}
+
+  .day-col{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:16px;display:flex;flex-direction:column;gap:10px;min-height:200px;border:2px solid transparent;}
+  .day-col.changed{border-color:var(--secondary);}
+
+  .day-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .day-head-left .day-num{font-size:13px;font-weight:700;color:var(--primary-dark);}
+  .day-head-left .day-theme{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+  .badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;}
+  .badge.modified{background:var(--secondary);color:#fff;}
+  .badge.pending{background:rgba(255,112,67,.12);color:var(--secondary-dark);}
+
+  .warning-box{display:none;background:var(--warning-bg);border-left:3px solid var(--warning);border-radius:6px;padding:9px 11px;font-size:12px;color:#7a4a00;line-height:1.5;}
+  .warning-box.show{display:block;}
+  .warning-box .w-title{font-weight:700;color:var(--warning);display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+  .warning-box .w-dot{width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block;}
+
+  .activity-list{display:flex;flex-direction:column;gap:8px;flex:1;}
+  .activity-item{border:1px solid var(--divider);border-radius:8px;padding:10px 11px;background:#fff;cursor:grab;display:flex;gap:10px;align-items:flex-start;}
+  .activity-item:active{cursor:grabbing;}
+  .activity-item.dragging{opacity:.4;}
+  .activity-item.drop-target{border-color:var(--primary);background:rgba(0,137,123,.06);}
+  .drag-handle{color:var(--text-disabled);font-size:12px;line-height:1.1;padding-top:2px;user-select:none;}
+  .activity-body{flex:1;min-width:0;}
+  .activity-top{display:flex;justify-content:space-between;gap:6px;font-size:12px;}
+  .activity-time{font-weight:700;color:var(--primary-dark);}
+  .activity-cat{color:var(--text-secondary);font-size:11px;}
+  .activity-title{font-size:13px;font-weight:600;margin-top:3px;}
+  .activity-meta{font-size:11px;color:var(--text-secondary);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;}
+  .img-ph{width:100%;height:50px;margin-top:6px;border:1px dashed var(--divider);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-disabled);}
+
+  .day-actions{display:flex;flex-direction:column;gap:6px;margin-top:2px;}
+  .day-actions .row{display:flex;gap:6px;}
+  .day-actions .btn{flex:1;}
+  .hint{font-size:11px;color:var(--text-secondary);text-align:center;}
+
+  .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:50;}
+  .loading-overlay.show{display:flex;}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(0,137,123,.2);border-top-color:var(--primary);animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-text{font-size:13px;color:var(--text-primary);}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--primary-dark);color:#fff;font-size:13px;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .25s, transform .25s;z-index:60;box-shadow:var(--shadow-2);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .annot{max-width:1100px;margin:0 auto 40px;padding:0 24px;font-size:12px;color:var(--text-secondary);}
+  .annot h3{font-size:13px;color:var(--text-primary);margin-bottom:6px;}
+  .annot ul{margin:0;padding-left:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <div class="wf-banner">WIREFRAME · 일정표 화면 (MUI 틸/코랄 테마, 클릭/드래그 인터랙션 시뮬레이션) — 실제 문구 아님</div>
+
+  <header class="appbar">
+    <div class="brand"><div class="mark">AI</div>여행 플래너</div>
+    <nav>
+      <a>새 일정 만들기</a>
+      <a class="active">일정표</a>
+      <a>저장한 여행</a>
+      <a>로그아웃</a>
+    </nav>
+  </header>
+
+  <div class="trip-bar">
+    <div>
+      <div class="trip-title-row">
+        <span class="trip-title">부산 2박 3일 힐링+먹방 일정</span>
+        <span class="chip" id="revisionChip">revision 1</span>
+      </div>
+      <div class="trip-sub">목적지: 부산 · 2026-08-10 ~ 2026-08-12 · 예산: 중간 · 취향: 힐링, 먹방</div>
+    </div>
+    <div class="trip-actions">
+      <span class="revision-tag" id="unsavedTag" style="display:none;">저장되지 않은 변경사항</span>
+      <button class="btn outlined small">목록으로</button>
+      <button class="btn secondary" id="saveBtn">일정 저장</button>
+    </div>
+  </div>
+
+  <div class="days-wrap" id="daysWrap"></div>
+
+  <div class="annot">
+    <h3>와이어프레임 설명 (PRD 참조)</h3>
+    <ul>
+      <li>각 Day 카드 내 활동 항목은 드래그로 순서 변경 가능 (동일 날짜 내에서만) — PRD 6.3</li>
+      <li>순서를 바꾸면 해당 Day에 "순서 변경 대기" 배지가 뜨고 "재조정 요청" 버튼이 활성화됩니다. 재조정은 변경된 날짜만 재계산하고 나머지 날짜는 원본 그대로 유지합니다 — PRD 6.3, 8.3 last_modified</li>
+      <li>재조정 결과가 지리적으로 비효율적이면 경고(warning 컬러) 배지 + tips 문구가 노출되고, "동선 최적화 재요청" 버튼으로 재조정 기능과 연결됩니다 — PRD 6.5 route_warning</li>
+      <li>재조정할 때마다 상단 revision 카운트가 증가합니다 — PRD 8.3 meta.revision</li>
+      <li>변경됨 배지·저장 버튼은 secondary(코랄), 그 외 주요 정보는 primary(틸)로 구분해 시각적 위계를 줌</li>
+    </ul>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">AI가 동선을 재조정하는 중...</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  let trip = {
+    revision: 1,
+    days: [
+      { day:1, theme:"도착 및 시내 탐방", last_modified:false, route_warning:{flagged:false, reason:null},
+        activities:[
+          {id:"d1-a1", time:"09:00", title:"해운대 도착", category:"관광지", duration:"90분", location:"해운대구", cost:"0원"},
+          {id:"d1-a2", time:"11:00", title:"해운대 시장 먹방", category:"맛집", duration:"60분", location:"해운대구", cost:"20,000원"},
+          {id:"d1-a3", time:"14:00", title:"동백섬 산책", category:"자연", duration:"70분", location:"해운대구", cost:"0원"},
+        ]},
+      { day:2, theme:"원도심 및 야경", last_modified:false, route_warning:{flagged:false, reason:null},
+        activities:[
+          {id:"d2-a1", time:"09:30", title:"감천문화마을", category:"관광지", duration:"120분", location:"사하구", cost:"0원"},
+          {id:"d2-a2", time:"13:00", title:"자갈치시장 점심", category:"맛집", duration:"60분", location:"중구", cost:"25,000원"},
+          {id:"d2-a3", time:"19:00", title:"광안리 야경", category:"야경", duration:"90분", location:"수영구", cost:"0원"},
+        ]},
+      { day:3, theme:"휴식 및 출국", last_modified:false, route_warning:{flagged:false, reason:null},
+        activities:[
+          {id:"d3-a1", time:"10:00", title:"태종대 산책", category:"자연", duration:"100분", location:"영도구", cost:"0원"},
+          {id:"d3-a2", time:"13:00", title:"국제시장 쇼핑", category:"쇼핑", duration:"60분", location:"중구", cost:"자유"},
+        ]}
+    ]
+  };
+
+  const pendingChange = {};
+  let dragSrcIndex = null;
+  let dragDay = null;
+
+  const daysWrap = document.getElementById('daysWrap');
+  const revisionChip = document.getElementById('revisionChip');
+  const unsavedTag = document.getElementById('unsavedTag');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const loadingText = document.getElementById('loadingText');
+  const toastEl = document.getElementById('toast');
+
+  function showToast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'), 2200); }
+  function showLoading(text){ loadingText.textContent = text; loadingOverlay.classList.add('show'); }
+  function hideLoading(){ loadingOverlay.classList.remove('show'); }
+
+  function render(){
+    revisionChip.textContent = 'revision ' + trip.revision;
+    const anyPending = Object.values(pendingChange).some(Boolean);
+    unsavedTag.style.display = anyPending ? 'inline' : 'none';
+
+    daysWrap.innerHTML = '';
+    trip.days.forEach((day) => {
+      const col = document.createElement('div');
+      col.className = 'day-col' + (pendingChange[day.day] ? ' changed' : '');
+
+      const head = document.createElement('div');
+      head.className = 'day-head';
+      head.innerHTML = `
+        <div class="day-head-left">
+          <div class="day-num">Day ${day.day}</div>
+          <div class="day-theme">${day.theme}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
+          ${day.last_modified ? '<span class="badge modified">변경됨</span>' : ''}
+          ${pendingChange[day.day] ? '<span class="badge pending">순서 변경 대기</span>' : ''}
+        </div>`;
+      col.appendChild(head);
+
+      const warnBox = document.createElement('div');
+      warnBox.className = 'warning-box' + (day.route_warning.flagged ? ' show' : '');
+      warnBox.innerHTML = `<div class="w-title"><span class="w-dot"></span>동선 확인 필요</div><div>${day.route_warning.reason || ''}</div>`;
+      col.appendChild(warnBox);
+
+      const list = document.createElement('div');
+      list.className = 'activity-list';
+      list.dataset.day = day.day;
+
+      day.activities.forEach((a, idx) => {
+        const item = document.createElement('div');
+        item.className = 'activity-item';
+        item.draggable = true;
+        item.dataset.day = day.day;
+        item.dataset.index = idx;
+        item.innerHTML = `
+          <div class="drag-handle">::</div>
+          <div class="activity-body">
+            <div class="activity-top"><span class="activity-time">${a.time}</span><span class="activity-cat">${a.category}</span></div>
+            <div class="activity-title">${a.title}</div>
+            <div class="activity-meta"><span>${a.duration}</span><span>·</span><span>${a.location}</span><span>·</span><span>${a.cost}</span></div>
+            <div class="img-ph">이미지 영역</div>
+          </div>`;
+        attachDragEvents(item);
+        list.appendChild(item);
+      });
+      col.appendChild(list);
+
+      const actions = document.createElement('div');
+      actions.className = 'day-actions';
+      const row1 = document.createElement('div');
+      row1.className = 'row';
+      const reorderBtn = document.createElement('button');
+      reorderBtn.className = 'btn secondary small';
+      reorderBtn.textContent = '재조정 요청';
+      reorderBtn.disabled = !pendingChange[day.day];
+      reorderBtn.addEventListener('click', () => requestReorder(day.day));
+      row1.appendChild(reorderBtn);
+      actions.appendChild(row1);
+
+      if(day.route_warning.flagged){
+        const row2 = document.createElement('div');
+        row2.className = 'row';
+        const optBtn = document.createElement('button');
+        optBtn.className = 'btn outlined small';
+        optBtn.textContent = '동선 최적화 재요청';
+        optBtn.addEventListener('click', () => requestOptimize(day.day));
+        row2.appendChild(optBtn);
+        actions.appendChild(row2);
+      }
+
+      const hint = document.createElement('div');
+      hint.className = 'hint';
+      hint.textContent = '카드를 드래그해 순서를 바꿔보세요';
+      actions.appendChild(hint);
+
+      col.appendChild(actions);
+      daysWrap.appendChild(col);
+    });
+  }
+
+  function attachDragEvents(item){
+    item.addEventListener('dragstart', (e)=>{ dragSrcIndex = Number(item.dataset.index); dragDay = Number(item.dataset.day); item.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    item.addEventListener('dragend', ()=>{ item.classList.remove('dragging'); document.querySelectorAll('.drop-target').forEach(el=>el.classList.remove('drop-target')); });
+    item.addEventListener('dragover', (e)=>{ if(Number(item.dataset.day) !== dragDay) return; e.preventDefault(); item.classList.add('drop-target'); });
+    item.addEventListener('dragleave', ()=>{ item.classList.remove('drop-target'); });
+    item.addEventListener('drop', (e)=>{
+      e.preventDefault(); item.classList.remove('drop-target');
+      const targetDay = Number(item.dataset.day);
+      const targetIndex = Number(item.dataset.index);
+      if(targetDay !== dragDay) return;
+      const dayObj = trip.days.find(d=>d.day===targetDay);
+      const [moved] = dayObj.activities.splice(dragSrcIndex, 1);
+      dayObj.activities.splice(targetIndex, 0, moved);
+      pendingChange[targetDay] = true;
+      render();
+    });
+  }
+
+  function requestReorder(dayNum){
+    showLoading('AI가 Day ' + dayNum + ' 동선을 재계산하는 중... (다른 날짜는 그대로 유지됩니다)');
+    setTimeout(()=>{
+      const dayObj = trip.days.find(d=>d.day===dayNum);
+      trip.days.forEach(d=> d.last_modified = false);
+      dayObj.last_modified = true;
+      trip.revision += 1;
+      pendingChange[dayNum] = false;
+      const timesOrder = dayObj.activities.map(a=>a.time);
+      const isSorted = timesOrder.every((t,i)=> i===0 || t >= timesOrder[i-1]);
+      dayObj.route_warning = isSorted
+        ? {flagged:false, reason:null}
+        : {flagged:true, reason:'변경된 순서대로면 이동 동선이 비효율적입니다. 이동 소요시간을 반영해 예상 도착 시간이 지연될 수 있어요.'};
+      hideLoading(); render();
+      showToast('Day ' + dayNum + ' 재조정 완료 (revision ' + trip.revision + ')');
+    }, 900);
+  }
+
+  function requestOptimize(dayNum){
+    showLoading('AI가 Day ' + dayNum + ' 동선을 최적화하는 중...');
+    setTimeout(()=>{
+      const dayObj = trip.days.find(d=>d.day===dayNum);
+      dayObj.activities.sort((a,b)=> a.time.localeCompare(b.time));
+      dayObj.route_warning = {flagged:false, reason:null};
+      trip.days.forEach(d=> d.last_modified = false);
+      dayObj.last_modified = true;
+      trip.revision += 1;
+      hideLoading(); render();
+      showToast('Day ' + dayNum + ' 동선이 개선되었습니다 (revision ' + trip.revision + ')');
+    }, 900);
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', ()=>{
+    Object.keys(pendingChange).forEach(k=> pendingChange[k]=false);
+    showToast('일정이 저장되었습니다.');
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

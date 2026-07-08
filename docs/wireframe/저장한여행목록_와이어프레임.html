@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>와이어프레임 · 저장한 여행 목록 — AI 여행 플래너</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --primary:#00897B; --primary-dark:#00695C; --primary-light:#4DB6AC; --primary-contrast:#FFFFFF;
+    --secondary:#FF7043; --secondary-dark:#E64A19; --secondary-light:#FFA270; --secondary-contrast:#FFFFFF;
+    --bg-default:#FAFAFA; --bg-paper:#FFFFFF;
+    --text-primary:rgba(0,0,0,0.87); --text-secondary:rgba(0,0,0,0.6); --text-disabled:rgba(0,0,0,0.38);
+    --divider:rgba(0,0,0,0.12);
+    --warning:#ED6C02; --warning-bg:rgba(237,108,2,0.08);
+    --shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+    --shadow-2:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);
+    --shadow-3:0px 3px 5px -1px rgba(0,0,0,0.2),0px 6px 10px 0px rgba(0,0,0,0.14),0px 1px 18px 0px rgba(0,0,0,0.12);
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Roboto','Helvetica Neue',Arial,sans-serif;background:var(--bg-default);color:var(--text-primary);}
+  .wf-banner{background:#212121;color:#fff;font-size:12px;padding:6px 16px;text-align:center;letter-spacing:.02em;}
+
+  .appbar{height:64px;background:var(--primary);color:var(--primary-contrast);display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-2);flex-wrap:wrap;gap:8px;}
+  .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;}
+  .appbar .brand .mark{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .appbar nav{display:flex;gap:4px;flex-wrap:wrap;}
+  .appbar nav a{color:rgba(255,255,255,.85);font-size:14px;font-weight:500;padding:10px 14px;border-radius:6px;text-decoration:none;cursor:pointer;}
+  .appbar nav a.active{color:#fff;background:rgba(255,255,255,.18);}
+  .appbar nav a:hover{background:rgba(255,255,255,.1);}
+
+  .page{max-width:1200px;margin:0 auto;padding:28px 24px 60px;}
+  .page-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+  .page-title{font-size:22px;font-weight:700;}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .search{height:40px;border-radius:20px;border:1px solid var(--divider);padding:0 16px;font-size:14px;font-family:inherit;width:240px;background:#fff;}
+  .search:focus{outline:none;border-color:var(--primary);}
+  .sort{height:40px;border-radius:8px;border:1px solid var(--divider);padding:0 12px;font-size:13px;font-family:inherit;background:#fff;color:var(--text-secondary);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:var(--radius);font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;}
+  .btn.outlined{background:transparent;border:1px solid rgba(0,137,123,.5);color:var(--primary-dark);}
+  .btn.outlined:hover{background:rgba(0,137,123,.06);}
+  .btn.text{background:transparent;color:var(--text-secondary);border:none;}
+
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:18px;}
+  @media (max-width:980px){.grid{grid-template-columns:repeat(2,minmax(240px,1fr));}}
+  @media (max-width:640px){.grid{grid-template-columns:1fr;}}
+
+  .trip-card{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:18px;display:flex;flex-direction:column;gap:10px;cursor:pointer;transition:box-shadow .15s, transform .15s;}
+  .trip-card:hover{box-shadow:var(--shadow-3);transform:translateY(-2px);}
+  .thumb{height:110px;border-radius:6px;background:linear-gradient(135deg, rgba(0,137,123,.16), rgba(255,112,67,.16));display:flex;align-items:center;justify-content:center;color:var(--text-disabled);font-size:12px;}
+  .trip-dest{font-size:16px;font-weight:700;}
+  .trip-dates{font-size:12px;color:var(--text-secondary);}
+  .chip-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;font-size:11px;font-weight:700;}
+  .chip.primary{background:rgba(0,137,123,.12);color:var(--primary-dark);}
+  .chip.warning{background:var(--warning-bg);color:var(--warning);}
+  .pref-tags{font-size:11px;color:var(--text-secondary);}
+  .card-footer{display:flex;justify-content:flex-end;margin-top:4px;}
+
+  .empty-state{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:80px 20px;color:var(--text-secondary);}
+  .empty-state.show{display:flex;}
+  .empty-state .icon{width:56px;height:56px;border-radius:50%;background:rgba(0,137,123,.1);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--primary);}
+  .empty-state .msg{font-size:14px;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--primary-dark);color:#fff;font-size:13px;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .25s, transform .25s;z-index:60;box-shadow:var(--shadow-2);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .annot{max-width:1200px;margin:32px auto 0;padding:0 24px;font-size:12px;color:var(--text-secondary);}
+  .annot h3{font-size:13px;color:var(--text-primary);margin-bottom:6px;}
+  .annot ul{margin:0;padding-left:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <div class="wf-banner">WIREFRAME · 저장한 여행 목록 — MUI 틸/코랄 테마 — 실제 문구/데이터 아님</div>
+
+  <header class="appbar">
+    <div class="brand"><div class="mark">AI</div>여행 플래너</div>
+    <nav>
+      <a>새 일정 만들기</a>
+      <a>일정표</a>
+      <a class="active">저장한 여행</a>
+      <a>로그아웃</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <div class="page-title">저장한 여행</div>
+      <div class="toolbar">
+        <input class="search" placeholder="목적지로 검색">
+        <select class="sort"><option>최신순</option></select>
+        <button class="btn text" id="toggleEmpty">빈 상태 예시 보기</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="empty-state" id="emptyState">
+      <div class="icon">✈</div>
+      <div class="msg">아직 저장한 여행이 없어요. 새 일정을 만들어보세요.</div>
+      <button class="btn outlined">새 일정 만들기</button>
+    </div>
+  </div>
+
+  <div class="annot">
+    <h3>와이어프레임 설명 (PRD 참조)</h3>
+    <ul>
+      <li>GET /api/trips — 최신순 정렬로 조회 (PRD 9절)</li>
+      <li>카드 클릭 시 GET /api/trips/{trip_id}로 상세 진입, 일정표 화면으로 이동 (PRD 6.4)</li>
+      <li>동선 주의 칩(warning 컬러)은 해당 여행에 route_warning.flagged=true인 day가 1개 이상 있을 때 표시 — PRD 6.5</li>
+      <li>revision 칩은 최종 저장 시점의 재조정 반영 횟수 — PRD 8.3 meta.revision</li>
+    </ul>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const trips = [
+    {dest:"부산", dates:"2026-08-10 ~ 2026-08-12", revision:2, flaggedDays:1, prefs:"힐링, 먹방"},
+    {dest:"오사카", dates:"2026-09-01 ~ 2026-09-05", revision:1, flaggedDays:0, prefs:"쇼핑, 먹방"},
+    {dest:"제주", dates:"2026-07-20 ~ 2026-07-22", revision:4, flaggedDays:2, prefs:"자연, 힐링"},
+    {dest:"파리", dates:"2026-10-02 ~ 2026-10-08", revision:1, flaggedDays:0, prefs:"문화/역사, 사진맛집"},
+    {dest:"방콕", dates:"2026-11-15 ~ 2026-11-18", revision:3, flaggedDays:0, prefs:"먹방, 액티비티"},
+  ];
+
+  const grid = document.getElementById('grid');
+  const toast = document.getElementById('toast');
+
+  function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 2200); }
+
+  function render(){
+    grid.innerHTML = '';
+    trips.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'trip-card';
+      card.innerHTML = `
+        <div class="thumb">지도/썸네일 영역</div>
+        <div class="trip-dest">${t.dest}</div>
+        <div class="trip-dates">${t.dates}</div>
+        <div class="chip-row">
+          <span class="chip primary">revision ${t.revision}</span>
+          ${t.flaggedDays > 0 ? `<span class="chip warning">동선 주의 ${t.flaggedDays}일</span>` : ''}
+        </div>
+        <div class="pref-tags">취향: ${t.prefs}</div>
+        <div class="card-footer"><button class="btn outlined">상세보기</button></div>
+      `;
+      card.addEventListener('click', () => showToast(t.dest + ' 일정표로 이동 (시뮬레이션)'));
+      grid.appendChild(card);
+    });
+  }
+  render();
+
+  document.getElementById('toggleEmpty').addEventListener('click', () => {
+    const empty = document.getElementById('emptyState');
+    const showingEmpty = empty.classList.toggle('show');
+    grid.style.display = showingEmpty ? 'none' : 'grid';
+  });
+})();
+</script>
+</body>
+</html>

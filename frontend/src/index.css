@@ -1,0 +1,9 @@
+/*
+ * 전역 리셋은 MUI의 CssBaseline이 담당한다.
+ * 여기서는 Vite 템플릿의 기본 데모 스타일만 정리한다.
+ */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>와이어프레임 · 일정 생성 폼 — AI 여행 플래너</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --primary:#00897B; --primary-dark:#00695C; --primary-light:#4DB6AC; --primary-contrast:#FFFFFF;
+    --secondary:#FF7043; --secondary-dark:#E64A19; --secondary-light:#FFA270; --secondary-contrast:#FFFFFF;
+    --bg-default:#FAFAFA; --bg-paper:#FFFFFF;
+    --text-primary:rgba(0,0,0,0.87); --text-secondary:rgba(0,0,0,0.6); --text-disabled:rgba(0,0,0,0.38);
+    --divider:rgba(0,0,0,0.12);
+    --warning:#ED6C02; --warning-bg:rgba(237,108,2,0.08);
+    --error:#D32F2F; --success:#2E7D32;
+    --shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+    --shadow-2:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Roboto','Helvetica Neue',Arial,sans-serif;background:var(--bg-default);color:var(--text-primary);}
+  .wf-banner{background:#212121;color:#fff;font-size:12px;padding:6px 16px;text-align:center;letter-spacing:.02em;}
+
+  .appbar{height:64px;background:var(--primary);color:var(--primary-contrast);display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-2);flex-wrap:wrap;gap:8px;}
+  .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;}
+  .appbar .brand .mark{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .appbar nav{display:flex;gap:4px;flex-wrap:wrap;}
+  .appbar nav a{color:rgba(255,255,255,.85);font-size:14px;font-weight:500;padding:10px 14px;border-radius:6px;text-decoration:none;cursor:pointer;}
+  .appbar nav a.active{color:#fff;background:rgba(255,255,255,.18);}
+  .appbar nav a:hover{background:rgba(255,255,255,.1);}
+
+  .page{max-width:720px;margin:0 auto;padding:32px 20px 60px;}
+  .page-title{font-size:22px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-secondary);margin-bottom:24px;}
+
+  .card{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:28px;}
+
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:22px;}
+  .field label{font-size:13px;color:var(--text-secondary);font-weight:500;}
+  .field label .req{color:var(--secondary-dark);}
+  .field input, .field select, .field textarea{
+    height:44px;border-radius:4px;border:1px solid rgba(0,0,0,.23);padding:0 12px;font-size:14px;font-family:inherit;color:var(--text-primary);background:#fff;
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border:2px solid var(--primary);padding:0 11px;}
+  .field .helper{font-size:12px;color:var(--text-secondary);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:560px){.row2{grid-template-columns:1fr;}}
+
+  .chip-group{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:16px;font-size:13px;font-weight:500;gap:6px;cursor:pointer;user-select:none;border:1px solid var(--divider);color:var(--text-secondary);background:#fff;transition:all .12s;}
+  .chip:hover{border-color:var(--primary-light);}
+  .chip.selected{background:rgba(0,137,123,.12);border-color:var(--primary);color:var(--primary-dark);font-weight:700;}
+  .chip .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:0;}
+  .chip.selected .dot{opacity:1;}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 22px;border-radius:var(--radius);font-size:15px;font-weight:600;border:none;cursor:pointer;font-family:inherit;width:100%;}
+  .btn.secondary{background:var(--secondary);color:#fff;box-shadow:var(--shadow-1);}
+  .btn.secondary:hover{background:var(--secondary-dark);}
+  .btn:disabled{background:rgba(0,0,0,.12)!important;color:rgba(0,0,0,.26)!important;box-shadow:none;cursor:not-allowed;}
+
+  .form-footer{margin-top:8px;font-size:12px;color:var(--text-secondary);text-align:center;}
+
+  .loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:50;}
+  .loading-overlay.show{display:flex;}
+  .spinner{width:36px;height:36px;border-radius:50%;border:3px solid rgba(0,137,123,.2);border-top-color:var(--primary);animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-text{font-size:14px;color:var(--text-primary);}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--primary-dark);color:#fff;font-size:13px;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .25s, transform .25s;z-index:60;box-shadow:var(--shadow-2);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .annot{max-width:720px;margin:32px auto 0;padding:0 20px;font-size:12px;color:var(--text-secondary);}
+  .annot h3{font-size:13px;color:var(--text-primary);margin-bottom:6px;}
+  .annot ul{margin:0;padding-left:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <div class="wf-banner">WIREFRAME · 일정 생성 폼 — MUI 테마(틸/코랄) 적용, 실제 문구/데이터 아님</div>
+
+  <header class="appbar">
+    <div class="brand"><div class="mark">AI</div>여행 플래너</div>
+    <nav>
+      <a class="active">새 일정 만들기</a>
+      <a>일정표</a>
+      <a>저장한 여행</a>
+      <a>로그아웃</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <div class="page-title">새 일정 만들기</div>
+    <div class="page-sub">목적지와 취향을 입력하면 AI가 일자별 여행 동선을 만들어드려요.</div>
+
+    <div class="card">
+      <div class="field">
+        <label>목적지 <span class="req">*</span></label>
+        <input type="text" id="destination" placeholder="예: 부산, 오사카, 파리">
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>시작일 <span class="req">*</span></label>
+          <input type="date" id="startDate">
+        </div>
+        <div class="field">
+          <label>종료일 <span class="req">*</span></label>
+          <input type="date" id="endDate">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>예산 수준 <span class="req">*</span></label>
+        <input type="text" id="budget" maxlength="30" placeholder="예: 알뜰하게, 100만원대, 럭셔리하게">
+        <div class="helper">자유롭게 입력 (최대 30자) — PRD 8.1 budget_level</div>
+      </div>
+
+      <div class="field">
+        <label>취향 (다중 선택) <span class="req">*</span></label>
+        <div class="chip-group" id="prefGroup">
+          <div class="chip" data-pref="힐링"><span class="dot"></span>힐링</div>
+          <div class="chip" data-pref="먹방"><span class="dot"></span>먹방</div>
+          <div class="chip" data-pref="액티비티"><span class="dot"></span>액티비티</div>
+          <div class="chip" data-pref="문화/역사"><span class="dot"></span>문화/역사</div>
+          <div class="chip" data-pref="쇼핑"><span class="dot"></span>쇼핑</div>
+          <div class="chip" data-pref="자연"><span class="dot"></span>자연</div>
+          <div class="chip" data-pref="야경"><span class="dot"></span>야경</div>
+          <div class="chip" data-pref="사진맛집"><span class="dot"></span>사진맛집</div>
+        </div>
+        <div class="helper">칩을 클릭해 다중 선택 — PRD 8.1 preferences (오픈 이슈 16: 태그 선택 vs 자유 텍스트 확정 필요)</div>
+      </div>
+
+      <button class="btn secondary" id="submitBtn" disabled>AI 일정 생성</button>
+      <div class="form-footer">생성에는 약 10~20초가 소요될 수 있어요</div>
+    </div>
+  </div>
+
+  <div class="annot">
+    <h3>와이어프레임 설명 (PRD 참조)</h3>
+    <ul>
+      <li>모든 필드는 필수 — 하나라도 비면 "AI 일정 생성" 버튼 비활성화 (PRD 8.1)</li>
+      <li>제출 시 POST /api/trips 호출, 동일 조건이면 ai_response_cache 히트로 즉시 반환될 수 있음 — PRD 6.8, 9절</li>
+      <li>생성 중에는 로딩 오버레이 표시, 완료 후 일정표 화면으로 이동 (이번 와이어프레임에서는 토스트로만 시뮬레이션)</li>
+      <li>컬러 테마: primary 틸(#00897B), secondary 코랄(#FF7043) — 주요 액션 버튼은 코랄로 강조</li>
+    </ul>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">AI가 일정을 생성하는 중...</div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const fields = ['destination','startDate','endDate','budget'];
+  const selectedPrefs = new Set();
+  const submitBtn = document.getElementById('submitBtn');
+
+  function validate(){
+    const filled = fields.every(id => document.getElementById(id).value.trim().length > 0);
+    submitBtn.disabled = !(filled && selectedPrefs.size > 0);
+  }
+  fields.forEach(id => document.getElementById(id).addEventListener('input', validate));
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const pref = chip.dataset.pref;
+      if(selectedPrefs.has(pref)){ selectedPrefs.delete(pref); chip.classList.remove('selected'); }
+      else{ selectedPrefs.add(pref); chip.classList.add('selected'); }
+      validate();
+    });
+  });
+
+  submitBtn.addEventListener('click', () => {
+    document.getElementById('loadingOverlay').classList.add('show');
+    setTimeout(() => {
+      document.getElementById('loadingOverlay').classList.remove('show');
+      const toast = document.getElementById('toast');
+      toast.textContent = '일정이 생성되었습니다 → 일정표 화면으로 이동 (시뮬레이션)';
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'), 2500);
+    }, 1400);
+  });
+})();
+</script>
+</body>
+</html>

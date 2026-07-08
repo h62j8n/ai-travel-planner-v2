@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>와이어프레임 · 관리자 - 인기 목적지 통계 — AI 여행 플래너</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --primary:#00897B; --primary-dark:#00695C; --primary-light:#4DB6AC;
+    --secondary:#FF7043; --secondary-dark:#E64A19;
+    --bg-default:#FAFAFA; --bg-paper:#FFFFFF;
+    --text-primary:rgba(0,0,0,0.87); --text-secondary:rgba(0,0,0,0.6); --text-disabled:rgba(0,0,0,0.38);
+    --divider:rgba(0,0,0,0.12);
+    --shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+    --shadow-2:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Roboto','Helvetica Neue',Arial,sans-serif;background:var(--bg-default);color:var(--text-primary);}
+  .wf-banner{background:#212121;color:#fff;font-size:12px;padding:6px 16px;text-align:center;letter-spacing:.02em;}
+
+  .appbar{height:64px;background:var(--primary-dark);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-2);flex-wrap:wrap;gap:8px;}
+  .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;}
+  .appbar .brand .mark{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .appbar .brand .admin-tag{font-size:11px;background:var(--secondary);padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px;}
+  .appbar nav{display:flex;gap:4px;flex-wrap:wrap;}
+  .appbar nav a{color:rgba(255,255,255,.85);font-size:14px;font-weight:500;padding:10px 14px;border-radius:6px;text-decoration:none;cursor:pointer;}
+  .appbar nav a.active{color:#fff;background:rgba(255,255,255,.18);}
+  .appbar nav a:hover{background:rgba(255,255,255,.1);}
+
+  .page{max-width:1000px;margin:0 auto;padding:28px 24px 60px;}
+  .page-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:6px;}
+  .page-title{font-size:22px;font-weight:700;}
+  .page-sub{font-size:13px;color:var(--text-secondary);margin-bottom:22px;}
+  .sort{height:38px;border-radius:8px;border:1px solid var(--divider);padding:0 12px;font-size:13px;font-family:inherit;background:#fff;color:var(--text-secondary);}
+
+  .card{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:22px;margin-bottom:20px;}
+  .card h4{margin:0 0 16px;font-size:14px;color:var(--text-secondary);font-weight:600;}
+
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .bar-label{width:70px;font-size:13px;font-weight:600;flex-shrink:0;}
+  .bar-track{flex:1;height:22px;background:rgba(0,0,0,.04);border-radius:6px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg, var(--primary), var(--primary-light));display:flex;align-items:center;justify-content:flex-end;padding-right:8px;transition:width .4s;}
+  .bar-fill.top{background:linear-gradient(90deg, var(--secondary-dark), var(--secondary));}
+  .bar-val{font-size:11px;color:#fff;font-weight:700;}
+
+  table.mui-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-1);}
+  table.mui-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);padding:12px 16px;border-bottom:1px solid var(--divider);background:rgba(0,0,0,.02);cursor:pointer;user-select:none;}
+  table.mui-table th:hover{color:var(--primary-dark);}
+  table.mui-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--divider);color:var(--text-primary);}
+  table.mui-table tr:last-child td{border-bottom:none;}
+  table.mui-table tr:hover td{background:rgba(0,0,0,.02);}
+  .chip{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:11px;font-size:11px;font-weight:700;background:rgba(0,137,123,.12);color:var(--primary-dark);}
+
+  .annot{max-width:1000px;margin:24px auto 0;padding:0 24px;font-size:12px;color:var(--text-secondary);}
+  .annot h3{font-size:13px;color:var(--text-primary);margin-bottom:6px;}
+  .annot ul{margin:0;padding-left:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <div class="wf-banner">WIREFRAME · 관리자 - 인기 목적지 통계 — MUI 틸/코랄 테마 — 실제 문구/데이터 아님</div>
+
+  <header class="appbar">
+    <div class="brand"><div class="mark">AI</div>여행 플래너<span class="admin-tag">ADMIN</span></div>
+    <nav>
+      <a>품질 모니터링</a>
+      <a class="active">인기 목적지 통계</a>
+      <a>프롬프트 템플릿 관리</a>
+      <a>로그아웃</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <div class="page-title">인기 목적지 통계</div>
+      <select class="sort"><option>전체 기간</option><option>이번 달</option><option>최근 7일</option></select>
+    </div>
+    <div class="page-sub">목적지별 생성 건수 — GET /api/admin/stats/destinations (Supabase SQL GROUP BY destination) — PRD 6.6</div>
+
+    <div class="card">
+      <h4>목적지별 생성 건수</h4>
+      <div id="barChart"></div>
+    </div>
+
+    <div class="card" style="padding:0;">
+      <table class="mui-table">
+        <thead><tr><th>순위</th><th>목적지</th><th>생성 건수</th><th>최근 생성일</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="annot">
+    <h3>와이어프레임 설명 (PRD 참조)</h3>
+    <ul>
+      <li>1위 목적지는 secondary(코랄) 강조, 나머지는 primary(틸) 그라데이션으로 구분</li>
+      <li>표 헤더 클릭 시 정렬 기준 변경(생성 건수 / 목적지명) — 실제 정렬 로직은 이 와이어프레임에서 생성 건수 기준으로 고정</li>
+      <li>기간 필터는 최초 생성(POST /api/trips) 시각 기준 집계 — PRD 6.6</li>
+    </ul>
+  </div>
+
+<script>
+(function(){
+  const data = [
+    {dest:"제주", count:38, last:"2026-07-07"},
+    {dest:"부산", count:31, last:"2026-07-06"},
+    {dest:"오사카", count:24, last:"2026-07-05"},
+    {dest:"방콕", count:19, last:"2026-07-04"},
+    {dest:"파리", count:12, last:"2026-06-30"},
+    {dest:"다낭", count:9, last:"2026-06-28"},
+  ];
+  const max = Math.max(...data.map(d=>d.count));
+
+  const barChart = document.getElementById('barChart');
+  data.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    const pct = Math.round((d.count / max) * 100);
+    row.innerHTML = `
+      <div class="bar-label">${d.dest}</div>
+      <div class="bar-track"><div class="bar-fill ${i===0?'top':''}" style="width:${pct}%"><span class="bar-val">${d.count}</span></div></div>
+    `;
+    barChart.appendChild(row);
+  });
+
+  const tableBody = document.getElementById('tableBody');
+  data.forEach((d, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><span class="chip">#${i+1}</span></td><td>${d.dest}</td><td>${d.count}건</td><td>${d.last}</td>`;
+    tableBody.appendChild(tr);
+  });
+})();
+</script>
+</body>
+</html>

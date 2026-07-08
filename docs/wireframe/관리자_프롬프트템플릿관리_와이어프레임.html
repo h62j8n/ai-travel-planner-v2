@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>와이어프레임 · 관리자 - 프롬프트 템플릿 관리 — AI 여행 플래너</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --primary:#00897B; --primary-dark:#00695C; --primary-light:#4DB6AC;
+    --secondary:#FF7043; --secondary-dark:#E64A19;
+    --bg-default:#FAFAFA; --bg-paper:#FFFFFF;
+    --text-primary:rgba(0,0,0,0.87); --text-secondary:rgba(0,0,0,0.6); --text-disabled:rgba(0,0,0,0.38);
+    --divider:rgba(0,0,0,0.12);
+    --success:#2E7D32;
+    --shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+    --shadow-2:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Roboto','Helvetica Neue',Arial,sans-serif;background:var(--bg-default);color:var(--text-primary);}
+  .wf-banner{background:#212121;color:#fff;font-size:12px;padding:6px 16px;text-align:center;letter-spacing:.02em;}
+
+  .appbar{height:64px;background:var(--primary-dark);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-2);flex-wrap:wrap;gap:8px;}
+  .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;}
+  .appbar .brand .mark{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .appbar .brand .admin-tag{font-size:11px;background:var(--secondary);padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px;}
+  .appbar nav{display:flex;gap:4px;flex-wrap:wrap;}
+  .appbar nav a{color:rgba(255,255,255,.85);font-size:14px;font-weight:500;padding:10px 14px;border-radius:6px;text-decoration:none;cursor:pointer;}
+  .appbar nav a.active{color:#fff;background:rgba(255,255,255,.18);}
+  .appbar nav a:hover{background:rgba(255,255,255,.1);}
+
+  .page{max-width:1200px;margin:0 auto;padding:28px 24px 60px;}
+  .page-title{font-size:22px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-secondary);margin-bottom:20px;}
+
+  .layout{display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start;}
+  @media (max-width:820px){.layout{grid-template-columns:1fr;}}
+
+  .list-card{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);overflow:hidden;}
+  .tmpl-item{padding:14px 16px;border-bottom:1px solid var(--divider);cursor:pointer;}
+  .tmpl-item:last-child{border-bottom:none;}
+  .tmpl-item:hover{background:rgba(0,0,0,.02);}
+  .tmpl-item.active{background:rgba(0,137,123,.1);border-left:3px solid var(--primary);}
+  .tmpl-name{font-size:13px;font-weight:700;}
+  .tmpl-meta{font-size:11px;color:var(--text-secondary);margin-top:3px;}
+
+  .editor-card{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:22px;}
+  .editor-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px;}
+  .editor-title{font-size:16px;font-weight:700;}
+  .editor-sub{font-size:12px;color:var(--text-secondary);margin-top:3px;}
+
+  textarea.prompt-editor{width:100%;min-height:280px;border-radius:8px;border:1px solid rgba(0,0,0,.23);padding:14px;font-family:'Roboto Mono', 'Courier New', monospace;font-size:13px;line-height:1.6;color:var(--text-primary);resize:vertical;}
+  textarea.prompt-editor:focus{outline:none;border:2px solid var(--primary);padding:13px;}
+
+  .version-row{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;}
+  .v-chip{height:26px;padding:0 12px;border-radius:13px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;background:#fff;border:1px solid var(--divider);color:var(--text-secondary);cursor:pointer;}
+  .v-chip.current{background:rgba(0,137,123,.12);border-color:var(--primary);color:var(--primary-dark);}
+
+  .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 18px;border-radius:var(--radius);font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;}
+  .btn.outlined{background:transparent;border:1px solid rgba(0,137,123,.5);color:var(--primary-dark);}
+  .btn.outlined:hover{background:rgba(0,137,123,.06);}
+  .btn.secondary{background:var(--secondary);color:#fff;box-shadow:var(--shadow-1);}
+  .btn.secondary:hover{background:var(--secondary-dark);}
+
+  .save-banner{display:none;align-items:center;gap:8px;background:rgba(46,125,50,.08);color:var(--success);border-left:3px solid var(--success);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:14px;}
+  .save-banner.show{display:flex;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--primary-dark);color:#fff;font-size:13px;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .25s, transform .25s;z-index:60;box-shadow:var(--shadow-2);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .annot{max-width:1200px;margin:24px auto 0;padding:0 24px;font-size:12px;color:var(--text-secondary);}
+  .annot h3{font-size:13px;color:var(--text-primary);margin-bottom:6px;}
+  .annot ul{margin:0;padding-left:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <div class="wf-banner">WIREFRAME · 관리자 - 프롬프트 템플릿 관리 — MUI 틸/코랄 테마 — 실제 문구/데이터 아님</div>
+
+  <header class="appbar">
+    <div class="brand"><div class="mark">AI</div>여행 플래너<span class="admin-tag">ADMIN</span></div>
+    <nav>
+      <a>품질 모니터링</a>
+      <a>인기 목적지 통계</a>
+      <a class="active">프롬프트 템플릿 관리</a>
+      <a>로그아웃</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <div class="page-title">프롬프트 템플릿 관리</div>
+    <div class="page-sub">GET/PUT /api/admin/prompt-templates — 조회/수정/버전 관리 — PRD 6.6</div>
+
+    <div class="layout">
+      <div class="list-card" id="tmplList"></div>
+
+      <div class="editor-card">
+        <div class="save-banner" id="saveBanner">저장되었습니다 — 새 버전으로 반영되었습니다.</div>
+        <div class="editor-head">
+          <div>
+            <div class="editor-title" id="editorTitle">-</div>
+            <div class="editor-sub" id="editorSub">-</div>
+          </div>
+        </div>
+
+        <div class="version-row" id="versionRow"></div>
+
+        <textarea class="prompt-editor" id="promptText"></textarea>
+
+        <div class="actions">
+          <button class="btn outlined" id="revertBtn">되돌리기</button>
+          <button class="btn secondary" id="saveBtn">새 버전으로 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annot">
+    <h3>와이어프레임 설명 (PRD 참조)</h3>
+    <ul>
+      <li>왼쪽 목록에서 템플릿 선택 → 오른쪽 편집기에 현재 버전 로드 — PRD 6.6</li>
+      <li>버전 칩 클릭 시 해당 버전 내용을 미리보기(읽기 전용), "새 버전으로 저장" 시 항상 새 버전이 추가되고 기존 버전은 보존됨</li>
+      <li>일반 사용자(user) 계정은 이 화면/API 접근 불가(403) — PRD 6.6, 10절</li>
+    </ul>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const templates = [
+    {
+      id:"initial_generate", name:"최초 생성 프롬프트", desc:"목적지/기간/예산/취향 입력 → 일자별 동선 생성",
+      versions:[
+        {v:1, text:"당신은 여행 일정 플래너입니다. 아래 조건에 맞는 {duration_days}일 일정을 JSON으로 생성하세요.\n목적지: {destination}\n예산: {budget_level}\n취향: {preferences}"},
+        {v:2, text:"당신은 여행 일정 플래너입니다. 아래 조건에 맞는 {duration_days}일 일정을 JSON으로 생성하세요.\n목적지: {destination}\n예산: {budget_level}\n취향: {preferences}\n\n반드시 지리적으로 합리적인 동선(같은 지역 우선 방문)으로 구성하세요."}
+      ]
+    },
+    {
+      id:"partial_reorder", name:"부분 재조정 프롬프트", desc:"변경된 day만 재계산, 나머지 day는 원본 그대로 유지 강제",
+      versions:[
+        {v:1, text:"trip_id={trip_id}의 day={day}만 재계산하세요. new_activity_order={new_activity_order}\n다른 day의 activities는 절대 수정하지 말고 원본 그대로 반환하세요."}
+      ]
+    },
+    {
+      id:"route_judgement", name:"동선 판정 프롬프트", desc:"이동거리/순서 기반 룰체크 + AI 자연어 사유 생성",
+      versions:[
+        {v:1, text:"아래 day의 활동 순서가 지리적으로 합리적인지 판단하세요.\n활동 목록: {activities}\n비효율적이면 flagged=true와 자연어 reason을 함께 반환하세요."},
+        {v:2, text:"아래 day의 활동 순서가 지리적으로 합리적인지 판단하세요.\n활동 목록: {activities}\n좌표 간 이동거리와 소요시간을 함께 고려하고, 비효율적이면 flagged=true와 자연어 reason을 함께 반환하세요."}
+      ]
+    }
+  ];
+
+  let activeId = templates[0].id;
+  let activeVersion = null;
+
+  const listEl = document.getElementById('tmplList');
+  const titleEl = document.getElementById('editorTitle');
+  const subEl = document.getElementById('editorSub');
+  const versionRow = document.getElementById('versionRow');
+  const promptText = document.getElementById('promptText');
+  const toast = document.getElementById('toast');
+  const saveBanner = document.getElementById('saveBanner');
+
+  function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 2200); }
+
+  function renderList(){
+    listEl.innerHTML = '';
+    templates.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'tmpl-item' + (t.id===activeId ? ' active' : '');
+      const latest = t.versions[t.versions.length-1];
+      item.innerHTML = `<div class="tmpl-name">${t.name}</div><div class="tmpl-meta">v${latest.v} · ${t.desc}</div>`;
+      item.addEventListener('click', () => { activeId = t.id; activeVersion = null; renderList(); renderEditor(); });
+      listEl.appendChild(item);
+    });
+  }
+
+  function renderEditor(){
+    const t = templates.find(x=>x.id===activeId);
+    const latest = t.versions[t.versions.length-1];
+    const showVersion = activeVersion || latest.v;
+    const versionObj = t.versions.find(v=>v.v===showVersion);
+
+    titleEl.textContent = t.name;
+    subEl.textContent = t.desc;
+    promptText.value = versionObj.text;
+
+    versionRow.innerHTML = '';
+    t.versions.forEach(v => {
+      const chip = document.createElement('div');
+      chip.className = 'v-chip' + (v.v===showVersion ? ' current' : '');
+      chip.textContent = 'v' + v.v + (v.v===latest.v ? ' (현재)' : '');
+      chip.addEventListener('click', () => { activeVersion = v.v; renderEditor(); });
+      versionRow.appendChild(chip);
+    });
+    saveBanner.classList.remove('show');
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', () => {
+    const t = templates.find(x=>x.id===activeId);
+    const newV = t.versions[t.versions.length-1].v + 1;
+    t.versions.push({v:newV, text:promptText.value});
+    activeVersion = newV;
+    renderList(); renderEditor();
+    saveBanner.classList.add('show');
+    showToast(t.name + ' → v' + newV + ' 저장 완료');
+  });
+
+  document.getElementById('revertBtn').addEventListener('click', () => { renderEditor(); });
+
+  renderList();
+  renderEditor();
+})();
+</script>
+</body>
+</html>

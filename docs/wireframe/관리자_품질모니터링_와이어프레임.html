@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>와이어프레임 · 관리자 - 품질 모니터링 — AI 여행 플래너</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --primary:#00897B; --primary-dark:#00695C; --primary-light:#4DB6AC; --primary-contrast:#FFFFFF;
+    --secondary:#FF7043; --secondary-dark:#E64A19;
+    --bg-default:#FAFAFA; --bg-paper:#FFFFFF;
+    --text-primary:rgba(0,0,0,0.87); --text-secondary:rgba(0,0,0,0.6); --text-disabled:rgba(0,0,0,0.38);
+    --divider:rgba(0,0,0,0.12);
+    --warning:#ED6C02; --warning-bg:rgba(237,108,2,0.08);
+    --shadow-1:0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12);
+    --shadow-2:0px 3px 3px -2px rgba(0,0,0,0.2),0px 3px 4px 0px rgba(0,0,0,0.14),0px 1px 8px 0px rgba(0,0,0,0.12);
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Roboto','Helvetica Neue',Arial,sans-serif;background:var(--bg-default);color:var(--text-primary);}
+  .wf-banner{background:#212121;color:#fff;font-size:12px;padding:6px 16px;text-align:center;letter-spacing:.02em;}
+
+  .appbar{height:64px;background:var(--primary-dark);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-2);flex-wrap:wrap;gap:8px;}
+  .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;}
+  .appbar .brand .mark{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .appbar .brand .admin-tag{font-size:11px;background:var(--secondary);padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px;}
+  .appbar nav{display:flex;gap:4px;flex-wrap:wrap;}
+  .appbar nav a{color:rgba(255,255,255,.85);font-size:14px;font-weight:500;padding:10px 14px;border-radius:6px;text-decoration:none;cursor:pointer;}
+  .appbar nav a.active{color:#fff;background:rgba(255,255,255,.18);}
+  .appbar nav a:hover{background:rgba(255,255,255,.1);}
+
+  .page{max-width:1200px;margin:0 auto;padding:28px 24px 60px;}
+  .page-title{font-size:22px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-secondary);margin-bottom:20px;}
+
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:22px;}
+  @media (max-width:720px){.stat-row{grid-template-columns:1fr;}}
+  .stat-card{background:var(--bg-paper);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:18px;}
+  .stat-num{font-size:26px;font-weight:700;color:var(--primary-dark);}
+  .stat-num.warn{color:var(--warning);}
+  .stat-label{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .search{height:38px;border-radius:8px;border:1px solid var(--divider);padding:0 14px;font-size:13px;font-family:inherit;background:#fff;width:220px;}
+  .search:focus{outline:none;border-color:var(--primary);}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+  .switch{width:36px;height:20px;border-radius:10px;background:var(--divider);position:relative;transition:.15s;}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--shadow-1);transition:.15s;}
+  .switch.on{background:var(--primary);}
+  .switch.on::after{left:18px;}
+
+  table.mui-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-1);}
+  table.mui-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);padding:12px 16px;border-bottom:1px solid var(--divider);background:rgba(0,0,0,.02);}
+  table.mui-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--divider);color:var(--text-primary);vertical-align:top;}
+  table.mui-table tr:last-child td{border-bottom:none;}
+  table.mui-table tr:hover td{background:rgba(0,0,0,.02);}
+  .chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;font-size:11px;font-weight:700;}
+  .chip.warning{background:var(--warning-bg);color:var(--warning);}
+  .chip.primary{background:rgba(0,137,123,.12);color:var(--primary-dark);}
+  .link-btn{background:transparent;border:none;color:var(--primary-dark);font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;}
+  .link-btn:hover{text-decoration:underline;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--primary-dark);color:#fff;font-size:13px;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .25s, transform .25s;z-index:60;box-shadow:var(--shadow-2);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .annot{max-width:1200px;margin:24px auto 0;padding:0 24px;font-size:12px;color:var(--text-secondary);}
+  .annot h3{font-size:13px;color:var(--text-primary);margin-bottom:6px;}
+  .annot ul{margin:0;padding-left:18px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+  <div class="wf-banner">WIREFRAME · 관리자 - 일정 품질 모니터링 — MUI 틸/코랄 테마 — 실제 문구/데이터 아님</div>
+
+  <header class="appbar">
+    <div class="brand"><div class="mark">AI</div>여행 플래너<span class="admin-tag">ADMIN</span></div>
+    <nav>
+      <a class="active">품질 모니터링</a>
+      <a>인기 목적지 통계</a>
+      <a>프롬프트 템플릿 관리</a>
+      <a>로그아웃</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <div class="page-title">일정 품질 모니터링</div>
+    <div class="page-sub">동선 이상(route_warning.flagged=true)으로 판정된 trip/day 목록 — PRD 6.5, 6.6, GET /api/admin/flagged-trips</div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num warn" id="totalFlagged">-</div><div class="stat-label">전체 플래그 건수</div></div>
+      <div class="stat-card"><div class="stat-num" id="weekFlagged">-</div><div class="stat-label">최근 7일 플래그</div></div>
+      <div class="stat-card"><div class="stat-num" id="topDest">-</div><div class="stat-label">플래그 최다 목적지</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input class="search" placeholder="목적지로 검색" id="searchInput">
+      <div class="toggle" id="flaggedOnlyToggle"><div class="switch on"></div>미해결만 보기</div>
+    </div>
+
+    <table class="mui-table">
+      <thead>
+        <tr><th>trip_id</th><th>목적지</th><th>Day</th><th>사유</th><th>판정 시각</th><th>사용자</th><th></th></tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="annot">
+    <h3>와이어프레임 설명 (PRD 참조)</h3>
+    <ul>
+      <li>이 화면의 데이터는 사용자 일정표 화면에 노출되는 route_warning과 동일한 판정 데이터를 관리자 시점으로 집계한 것 — PRD 6.5, 15절 결정로그</li>
+      <li>"상세보기" 클릭 시 해당 trip의 일정표 화면(관리자 열람 모드)으로 이동 — PRD 6.6</li>
+      <li>일반 사용자(user) 계정은 이 화면/API 접근 시 403 FORBIDDEN — PRD 6.6, 10절</li>
+    </ul>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const rows = [
+    {trip:"trip_a1b2", dest:"제주", day:2, reason:"이동 소요시간 대비 활동 간격이 짧아 지연 가능성", time:"2026-07-07 14:20", user:"user_2938"},
+    {trip:"trip_a1b2", dest:"제주", day:3, reason:"동선이 반대 방향으로 왕복하는 형태", time:"2026-07-07 14:20", user:"user_2938"},
+    {trip:"trip_c9x1", dest:"부산", day:2, reason:"변경된 순서대로면 이동 동선이 비효율적", time:"2026-07-06 09:02", user:"user_1042"},
+    {trip:"trip_e77z", dest:"방콕", day:1, reason:"이동 거리 대비 체류 시간이 지나치게 짧음", time:"2026-07-04 21:11", user:"user_5521"},
+  ];
+
+  const tableBody = document.getElementById('tableBody');
+  const searchInput = document.getElementById('searchInput');
+  const toast = document.getElementById('toast');
+  let flaggedOnly = true;
+
+  document.getElementById('totalFlagged').textContent = rows.length;
+  document.getElementById('weekFlagged').textContent = rows.filter(r=>r.time.startsWith('2026-07-0')).length;
+  document.getElementById('topDest').textContent = '제주';
+
+  function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 2200); }
+
+  function render(){
+    const q = searchInput.value.trim();
+    tableBody.innerHTML = '';
+    rows.filter(r => !q || r.dest.includes(q)).forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.trip}</td>
+        <td>${r.dest}</td>
+        <td><span class="chip warning">Day ${r.day}</span></td>
+        <td>${r.reason}</td>
+        <td>${r.time}</td>
+        <td>${r.user}</td>
+        <td><button class="link-btn">상세보기</button></td>
+      `;
+      tr.querySelector('.link-btn').addEventListener('click', ()=> showToast(r.trip + ' 상세로 이동 (시뮬레이션)'));
+      tableBody.appendChild(tr);
+    });
+  }
+  searchInput.addEventListener('input', render);
+  document.getElementById('flaggedOnlyToggle').addEventListener('click', function(){
+    flaggedOnly = !flaggedOnly;
+    this.querySelector('.switch').classList.toggle('on', flaggedOnly);
+  });
+  render();
+})();
+</script>
+</body>
+</html>
