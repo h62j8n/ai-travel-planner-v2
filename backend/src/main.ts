@@ -3,9 +3,13 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // PRD §9: 모든 API는 /api 프리픽스를 갖는다 (예: /api/auth/signup, /api/trips)
+  app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -13,6 +17,9 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // PRD §9 에러 응답 형식 { error, message } 통일
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('AI 여행 일정 플래너 API')

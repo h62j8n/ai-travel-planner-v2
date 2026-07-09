@@ -1,4 +1,47 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ItineraryDay } from '../trips/entities/itinerary-day.entity';
+import { FlaggedTripDto } from './dto/flagged-trip.dto';
 
 @Injectable()
-export class AdminService {}
+export class AdminService {
+  constructor(
+    @InjectRepository(ItineraryDay)
+    private readonly itineraryDaysRepository: Repository<ItineraryDay>,
+  ) {}
+
+  /**
+   * GET /api/admin/flagged-trips (PRD §6.5, §6.6 / §9)
+   * route_warning_flagged=true인 일자를 trips와 조인해 관리자 모니터링 목록으로 반환한다.
+   * flagged_at은 day.last_modified_at을 우선 사용하고, 없으면(재조정된 적 없는 최초 생성 건)
+   * trip.updated_at으로 대체한다(ERD §3.3에 판정 전용 타임스탬프 컬럼이 없어 채택한 대안).
+   */
+  async getFlaggedTrips(): Promise<FlaggedTripDto[]> {
+    const rows = await this.itineraryDaysRepository
+      .createQueryBuilder('day')
+      .innerJoin('day.trip', 'trip')
+      .select('trip.id', 'tripId')
+      .addSelect('trip.destination', 'destination')
+      .addSelect('day.dayNumber', 'dayNumber')
+      .addSelect('day.routeWarningReason', 'reason')
+      .addSelect('COALESCE(day.lastModifiedAt, trip.updatedAt)', 'flaggedAt')
+      .where('day.routeWarningFlagged = :flagged', { flagged: true })
+      .orderBy('COALESCE(day.lastModifiedAt, trip.updatedAt)', 'DESC')
+      .getRawMany<{
+        tripId: string;
+        destination: string;
+        dayNumber: number;
+        reason: string | null;
+        flaggedAt: Date;
+      }>();
+
+    return rows.map((row) => ({
+      trip_id: row.tripId,
+      destination: row.destination,
+      day: row.dayNumber,
+      reason: row.reason,
+      flagged_at: new Date(row.flaggedAt).toISOString(),
+    }));
+  }
+}
