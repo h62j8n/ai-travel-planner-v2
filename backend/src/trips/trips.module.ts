@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TripsController } from './trips.controller';
 import { TripsService } from './trips.service';
 import { ItineraryGeneratorService } from './itinerary-generator.service';
+import { GeminiClientService } from './gemini/gemini-client.service';
 import { Trip } from './entities/trip.entity';
 import { ItineraryDay } from './entities/itinerary-day.entity';
 import { ItineraryActivity } from './entities/itinerary-activity.entity';
@@ -20,7 +21,7 @@ import { AiResponseCache } from './entities/ai-response-cache.entity';
     ]),
   ],
   controllers: [TripsController],
-  providers: [TripsService, ItineraryGeneratorService],
+  providers: [TripsService, ItineraryGeneratorService, GeminiClientService],
   exports: [TripsService],
 })
 export class TripsModule {}

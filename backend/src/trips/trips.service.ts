@@ -101,7 +101,7 @@ export class TripsService {
       return cached.responseJson as GeneratedItinerary;
     }
 
-    const generated = this.itineraryGeneratorService.generate(
+    const generated = await this.itineraryGeneratorService.generate(
       dto,
       durationDays,
     );
