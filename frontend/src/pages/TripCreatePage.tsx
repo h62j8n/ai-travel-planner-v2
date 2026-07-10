@@ -1,12 +1,254 @@
-import { Typography } from '@mui/material';
+import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm, useWatch } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  CircularProgress,
+  FormControl,
+  FormControlLabel,
+  FormGroup,
+  FormHelperText,
+  FormLabel,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+import { createTrip } from '../api/tripApi';
+import { extractErrorMessage } from '../api/authApi';
+import {
+  PREFERENCE_OPTIONS,
+  tripCreateSchema,
+  type TripCreateFormValues,
+} from '../trips/tripSchemas';
+
+const DATE_FORMAT = 'YYYY-MM-DD';
 
 /**
  * 일정 생성 폼 (사용자)
  * PRD 6.2, 8.1, 11절 / docs/wireframe/일정생성폼_와이어프레임.html 참고
- * TODO: 목적지/기간/예산/취향 입력 폼(react-hook-form + zod) 구현
+ * 제출 시 POST /api/trips 호출 -> 응답 trip_id로 /trips/{trip_id} 이동 (PRD 9절).
  */
 function TripCreatePage() {
-  return <Typography variant="h5">일정 생성 폼</Typography>;
+  const navigate = useNavigate();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<TripCreateFormValues>({
+    resolver: zodResolver(tripCreateSchema),
+    defaultValues: {
+      destination: '',
+      start_date: '',
+      end_date: '',
+      budget_level: '',
+      preferences: [],
+    },
+  });
+
+  const watchedStartDate = useWatch({ control, name: 'start_date' });
+  const watchedEndDate = useWatch({ control, name: 'end_date' });
+
+  const onSubmit = async (values: TripCreateFormValues) => {
+    setSubmitError(null);
+    try {
+      const trip = await createTrip(values);
+      navigate(`/trips/${trip.trip_id}`);
+    } catch (error) {
+      setSubmitError(
+        extractErrorMessage(
+          error,
+          'AI 일정 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+        ),
+      );
+    }
+  };
+
+  return (
+    <Stack spacing={3} sx={{ maxWidth: 640, mx: 'auto' }}>
+      <Box>
+        <Typography variant="h5" component="h1">
+          새 일정 만들기
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          목적지와 취향을 입력하면 AI가 일자별 여행 동선을 만들어드려요.
+        </Typography>
+      </Box>
+
+      {submitError && <Alert severity="error">{submitError}</Alert>}
+
+      <Paper elevation={1} sx={{ p: 4 }}>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+          <Stack spacing={3}>
+            <TextField
+              label="목적지"
+              placeholder="예: 부산, 오사카, 파리"
+              required
+              fullWidth
+              error={!!errors.destination}
+              helperText={errors.destination?.message}
+              {...register('destination')}
+            />
+
+            <FormControl
+              component="fieldset"
+              fullWidth
+              required
+              error={!!errors.start_date || !!errors.end_date}
+            >
+              <FormLabel component="legend">여행 기간</FormLabel>
+              <Box
+                sx={{
+                  border: '1px solid',
+                  borderColor: errors.start_date || errors.end_date ? 'error.main' : 'divider',
+                  borderRadius: 1,
+                  p: 2,
+                  mt: 1,
+                }}
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: { sm: 'center' } }}
+                >
+                  <Controller
+                    name="start_date"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        label="시작일"
+                        format={DATE_FORMAT}
+                        value={field.value ? dayjs(field.value) : null}
+                        maxDate={watchedEndDate ? dayjs(watchedEndDate) : undefined}
+                        onChange={(date: Dayjs | null) =>
+                          field.onChange(date && date.isValid() ? date.format(DATE_FORMAT) : '')
+                        }
+                        slotProps={{
+                          textField: {
+                            required: true,
+                            fullWidth: true,
+                            error: !!errors.start_date,
+                            helperText: errors.start_date?.message,
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                  <ArrowRightAltIcon
+                    sx={{
+                      display: { xs: 'none', sm: 'block' },
+                      color: 'text.secondary',
+                    }}
+                  />
+                  <Controller
+                    name="end_date"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        label="종료일"
+                        format={DATE_FORMAT}
+                        value={field.value ? dayjs(field.value) : null}
+                        minDate={watchedStartDate ? dayjs(watchedStartDate) : undefined}
+                        onChange={(date: Dayjs | null) =>
+                          field.onChange(date && date.isValid() ? date.format(DATE_FORMAT) : '')
+                        }
+                        slotProps={{
+                          textField: {
+                            required: true,
+                            fullWidth: true,
+                            error: !!errors.end_date,
+                            helperText: errors.end_date?.message,
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                </Stack>
+              </Box>
+              {!errors.start_date && !errors.end_date && (
+                <FormHelperText>여행 시작일과 종료일을 함께 선택해 주세요.</FormHelperText>
+              )}
+            </FormControl>
+
+            <TextField
+              label="예산 수준"
+              placeholder="예: 알뜰하게, 100만원대, 럭셔리하게"
+              required
+              fullWidth
+              slotProps={{ htmlInput: { maxLength: 30 } }}
+              error={!!errors.budget_level}
+              helperText={errors.budget_level?.message ?? '자유롭게 입력해 주세요 (최대 30자).'}
+              {...register('budget_level')}
+            />
+
+            <Controller
+              name="preferences"
+              control={control}
+              render={({ field }) => (
+                <FormControl component="fieldset" required error={!!errors.preferences}>
+                  <FormLabel component="legend">취향 (다중 선택)</FormLabel>
+                  <FormGroup row>
+                    {PREFERENCE_OPTIONS.map((option) => (
+                      <FormControlLabel
+                        key={option}
+                        label={option}
+                        control={
+                          <Checkbox
+                            checked={field.value.includes(option)}
+                            onChange={(event) => {
+                              if (event.target.checked) {
+                                field.onChange([...field.value, option]);
+                              } else {
+                                field.onChange(
+                                  field.value.filter((value) => value !== option),
+                                );
+                              }
+                            }}
+                          />
+                        }
+                      />
+                    ))}
+                  </FormGroup>
+                  <FormHelperText>
+                    {errors.preferences?.message ?? '하나 이상 선택해 주세요.'}
+                  </FormHelperText>
+                </FormControl>
+              )}
+            />
+
+            <Button
+              type="submit"
+              variant="contained"
+              color="secondary"
+              size="large"
+              fullWidth
+              disabled={isSubmitting}
+              startIcon={
+                isSubmitting ? <CircularProgress size={18} color="inherit" /> : undefined
+              }
+            >
+              {isSubmitting ? 'AI 일정 생성 중...' : 'AI 일정 생성'}
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+              생성에는 약 10~20초가 소요될 수 있어요.
+            </Typography>
+          </Stack>
+        </Box>
+      </Paper>
+    </Stack>
+  );
 }
 
 export default TripCreatePage;
