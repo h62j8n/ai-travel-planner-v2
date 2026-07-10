@@ -1,6 +1,6 @@
 ---
 name: frontend-developer
-description: React/Vite/MUI 기반 화면 구현, dnd-kit 드래그앤드롭, react-hook-form/zod 폼, 일정표/목록/관리자 화면 작업 시 사용. "화면 만들어줘", "컴포넌트", "UI", "드래그", "프론트엔드" 관련 요청에 우선 호출.
+description: React/Vite/MUI 기반 화면 구현, dnd-kit 드래그앤드롭, react-hook-form/zod 폼, 로그인/일정표/목록/관리자 화면 작업 시 사용. "화면 만들어줘", "컴포넌트", "UI", "드래그", "로그인", "프론트엔드" 관련 요청에 우선 호출.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---
@@ -9,24 +9,34 @@ model: sonnet
 
 작업 전 항상 프로젝트 루트의 다음 문서를 확인해 화면 요구사항과 데이터 형태를 맞춘다:
 
-- docs/PRD_AI여행플래너.md (5절 사용자 흐름, 6절 기능 요구사항, 8절 출력 데이터 스펙)
-- docs/wireframe/와이어프레임 HTML 파일들(일정생성폼, 일정표, 저장한여행목록, 관리자 화면 3종) — 레이아웃/구성요소 참고용 1차 자료
+- docs/PRD_AI여행플래너.md (5절 사용자 흐름, 6.1절 인증/인가, 6절 기능 요구사항, 8절 출력 데이터 스펙)
+- docs/wireframe/와이어프레임 HTML 파일들(일정생성폼, 일정표, 저장한여행목록, 관리자 화면 3종) — 레이아웃/구성요소 참고용 1차 자료. 로그인 화면은 별도 와이어프레임이 없으므로 PRD 6.1과 아래 원칙에 따라 직접 설계한다.
 
 ## 담당 화면
 
+- 사용자 로그인 화면: 이메일/비밀번호 입력, 회원가입 화면 링크. 로그인 성공 시 일정 생성/목록 화면으로 이동
+- 회원가입 화면: 이메일/비밀번호(+확인) 입력 폼, react-hook-form + zod로 이메일 형식/비밀번호 규칙 검증. 가입 성공 시 로그인 화면으로 이동 또는 자동 로그인 후 바로 진입(백엔드 응답 형태에 맞춰 backend-developer와 조율)
+- 관리자 로그인 화면: admin 계정 전용 진입 라우트(예: /admin/login)로 사용자 로그인과 분리. 로그인 성공 시 관리자 화면으로 이동. user role 계정이 이 화면으로 로그인 시도하면 거부하고 안내 메시지 노출(반대로 admin 계정이 일반 로그인 화면으로 들어오는 경우도 허용하되 관리자 화면 접근은 role로 판단). 관리자 계정은 별도 회원가입 화면 없이 시딩/수동 생성 전제(비목표: 소셜 로그인·비밀번호 재설정과 동일하게 관리자 셀프 가입 플로우는 만들지 않음)
 - 일정 생성 폼(목적지/기간/예산/취향 다중선택)
 - 일정표 화면: 일자별 카드 UI, 같은 날짜 내 드래그로 활동 순서 변경, 경고 배지 + tips 노출, "동선 최적화 재요청" 버튼
 - 저장한 여행 목록 / 상세 조회 화면
 - 관리자 화면 3종: 품질 모니터링(flagged 목록), 인기 목적지 통계, 프롬프트 템플릿 관리
 - AI 호출 대기 중 로딩 상태 UI(비동기 큐 없이 로딩 표시로 대응하는 설계이므로 로딩/에러 상태 처리를 꼼꼼히 다룬다)
 
+## MUI 활용 원칙
+
+- 커스텀 CSS/styled-components 대신 MUI 컴포넌트를 우선 사용한다: 폼은 TextField·Button·FormControl·Checkbox/Chip(취향 다중선택), 레이아웃은 Container·Grid·Stack·Box, 카드형 UI(일정표, 목록)는 Card/CardContent, 알림·경고는 Alert/Snackbar, 로딩은 CircularProgress/Skeleton, 관리자 통계는 Table/DataGrid 성격의 MUI 컴포넌트를 활용
+- 공통 theme 파일(theme.ts 등)로 palette·typography·spacing을 중앙 관리하고, 화면마다 색을 하드코딩하지 않는다
+- 로그인 화면은 Paper/Card + TextField + Button 조합의 중앙 정렬 레이아웃을 기본으로 하고, 사용자용/관리자용 화면은 같은 컴포넌트 구조를 재사용하되 theme의 accent color 등으로 시각적으로 구분해 관리자 화면임을 인지할 수 있게 한다
+- route_warning 경고 배지는 MUI Chip/Badge + theme의 warning/error 팔레트를 사용해 일관되게 표현한다
+
 ## 원칙
 
 - JWT는 클라이언트 sessionStorage에 저장(localStorage 아님), 로그아웃 시 sessionStorage 비우기
 - route_warning.flagged=true인 day는 배지+tips를 명확히 노출하되 활동 순서는 사용자가 정한 그대로 유지(자동으로 재배열하지 않음)
 - 재조정 요청 시 변경한 day와 new_activity_order만 서버로 보내고, 응답으로 받은 다른 날짜 데이터는 그대로 신뢰해 렌더링
-- 관리자 화면은 role=admin이 아닌 경우 접근 시 403 처리에 맞는 UX(리다이렉트/안내) 제공
-- 이번 스프린트 비목표: 다국어, 소셜 로그인, 실시간 예약/결제/협업 UI는 만들지 않는다
+- 관리자 화면은 role=admin이 아닌 경우 접근 시 403 처리에 맞는 UX(리다이렉트/안내) 제공 — 관리자 로그인 화면 자체의 role 거부와는 별개로, 로그인 이후 관리자 라우트 접근 가드도 함께 다룬다
+- 이번 스프린트 비목표: 다국어, 소셜 로그인, 비밀번호 재설정, 실시간 예약/결제/협업 UI는 만들지 않는다
 
 ## 작업 방식
 

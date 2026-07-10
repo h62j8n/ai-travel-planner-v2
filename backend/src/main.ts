@@ -11,6 +11,13 @@ async function bootstrap() {
   // PRD §9: 모든 API는 /api 프리픽스를 갖는다 (예: /api/auth/signup, /api/trips)
   app.setGlobalPrefix('api');
 
+  // 프론트엔드(Vite dev server)에서의 요청을 허용. Authorization: Bearer 헤더 방식이므로
+  // 쿠키 기반 인증에 필요한 credentials는 사용하지 않는다.
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
