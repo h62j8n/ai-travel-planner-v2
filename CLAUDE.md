@@ -25,7 +25,7 @@
 - route_warning(flagged, reason)은 관리자 전용으로 숨기지 않고 사용자 화면에도 즉시 노출한다.
 - flagged=true인 day라도 활동 순서는 사용자가 정한 그대로 유지한다 — 자동으로 재배열하지 않는다.
 - 관리자 API(GET /admin/\*)는 role=admin이 아닌 경우 403을 반환하고, 프론트는 그에 맞는 리다이렉트/안내 UX를 제공한다.
-- **보안: 프롬프트/대화/코드에 민감한 정보를 절대 입력하지 않는다** — Supabase project ref, ANON_KEY, SECRET_KEY, API 키, 비밀번호는 .env 파일에만 저장하고, 프롬프트에는 placeholder(예: [YOUR_PROJECT_REF]) 또는 일반적인 설명만 사용한다. 유출 시 즉시 Supabase 대시보드에서 키를 재생성하거나 프로젝트를 재생성한다.
+- **보안 — .env 키값 절대 입력 금지**: .env 파일의 모든 민감한 정보(Supabase ANON_KEY, SECRET_KEY, Gemini API 키, JWT 시크릿, DB 비밀번호 등)는 프롬프트·작업·코드 리뷰에 입력하지 않는다. 대신 placeholder(`[YOUR_GEMINI_API_KEY]`, `[SUPABASE_SECRET_KEY]` 등)로 대체한다. 작업 중 .env를 열어야 하면 로컬에서만 참조하고 대화에 공유하지 않는다. 실수로 노출되면 즉시 해당 키를 재생성한다.
 
 ## 비용 제약
 
