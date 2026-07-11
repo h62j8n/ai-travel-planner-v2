@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -12,11 +13,15 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { ItineraryDay } from './itinerary-day.entity';
 import { TripRevision } from './trip-revision.entity';
+import { COMPANION_OPTIONS } from '../constants/trip-options.constants';
+import type { Companion } from '../constants/trip-options.constants';
 
 /**
  * trips 테이블 매핑 엔티티 (ERD §3.2)
+ * activity_time_start/end, companion은 v2.3(결정로그 §15)에서 추가된 컬럼.
  */
 @Entity('trips')
+@Check(`"companion" IN (${COMPANION_OPTIONS.map((v) => `'${v}'`).join(', ')})`)
 export class Trip {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -44,6 +49,15 @@ export class Trip {
 
   @Column({ type: 'varchar', length: 30, name: 'budget_level' })
   budgetLevel: string;
+
+  @Column({ type: 'time', name: 'activity_time_start' })
+  activityTimeStart: string;
+
+  @Column({ type: 'time', name: 'activity_time_end' })
+  activityTimeEnd: string;
+
+  @Column({ type: 'text' })
+  companion: Companion;
 
   @Column('text', { array: true })
   preferences: string[];

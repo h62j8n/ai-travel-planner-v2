@@ -55,7 +55,7 @@
 - 토큰 관리: JWT를 클라이언트 sessionStorage에 저장. 서버는 별도 토큰 테이블 없이 access token 자체(짧은 만료시간, 예: 30분~1시간)로만 인증하며, 로그아웃은 클라이언트에서 sessionStorage를 비우는 방식으로 처리(서버 측 강제 무효화는 지원하지 않음 — 탈취된 토큰은 만료 전까지 유효할 수 있다는 점을 알려진 트레이드오프로 명시)
 
 ### 6.2 일정 생성
-- 목적지, 여행 기간, 예산, 취향(다중 선택)을 입력받아 AI가 일자별 동선을 생성
+- 목적지, 여행 기간, 예산, 활동 시간대(시작/종료), 동반인, 취향(다중 선택)을 입력받아 AI가 일자별 동선을 생성
 - 생성 결과는 로그인한 사용자 계정에 저장(Supabase)
 
 ### 6.3 일정표 편집 및 재조정 (일자 단위 부분 재생성 — 확정)
@@ -102,7 +102,9 @@
 - destination(텍스트, 제한 없음, 필수)
 - start_date, end_date(YYYY-MM-DD, 필수)
 - budget_level(자유 텍스트, 최대 30자, 필수)
-- preferences(문자열 배열, 다중 선택, 필수)
+- activity_time_start, activity_time_end(HH:MM, 24시간제, 필수) — 예: "09:00", "20:00"
+- companion(문자열 enum, 필수): 혼자 | 친구 | 연인/배우자 | 아이 | 부모님 | 기타
+- preferences(문자열 배열, 다중 선택, 필수): 체험&액티비티, 자연, 유명 관광지, 힐링, 문화&예술&역사, 쇼핑, 먹방, SNS 핫플레이스
 
 ### 8.2 재조정 요청 입력
 - trip_id(Supabase trips 테이블 PK, 필수)
@@ -140,13 +142,14 @@
   "meta": { "generated_at": "2026-07-10T10:00:00Z", "revision": 2 }
 }
 ```
+- days[].activities[].time: 활동 시작 시간. 사용자 입력 activity_time_start/end 범위 내에서 AI가 결정함
 - days[].last_modified: 이번 재조정에서 실제로 재계산된 날짜인지(프론트 "변경됨" 뱃지용)
 - days[].route_warning: AI 판정 결과 — 사용자 화면 경고 배지 및 관리자 모니터링 목록에 공통으로 사용
 - meta.revision: 재조정 반영 횟수
 
 ## 9. API 계약
 - POST /api/auth/signup, POST /api/auth/login, POST /api/auth/logout
-- POST /api/trips — 최초 생성. 요청: `{ "destination": "부산", "start_date": "...", "end_date": "...", "budget_level": "...", "preferences": [...] }` / 응답(200): 8.3 스키마(trip_id 포함, revision=1). 동일 조건이 `ai_response_cache`에 있으면 캐시 결과 반환
+- POST /api/trips — 최초 생성. 요청: `{ "destination": "부산", "start_date": "2026-07-10", "end_date": "2026-07-12", "budget_level": "중상", "activity_time_start": "09:00", "activity_time_end": "20:00", "companion": "친구", "preferences": ["힐링", "먹방"] }` / 응답(200): 8.3 스키마(trip_id 포함, revision=1). 동일 조건이 `ai_response_cache`에 있으면 캐시 결과 반환
 - PATCH /api/trips/{trip_id}/reorder — 재조정. 요청: `{ "day": 2, "new_activity_order": ["d2-a3", "d2-a1", "d2-a2"] }` / 응답(200): 8.3 스키마 전체 재반환(해당 day만 last_modified: true, revision 증가)
 - GET /api/trips — 내 저장 목록(최신순)
 - GET /api/trips/{trip_id} — 저장된 일정 상세
@@ -234,9 +237,9 @@
 - 재조정 시 전체 재생성 대신 부분 수정: 변경 날짜만 재계산, 나머지는 원본 유지, 응답 검증으로 위반 감지. 근거: 사용자가 마음에 들어한 다른 날짜까지 사라지는 문제 방지
 - AI 판정 결과를 관리자 전용이 아닌 사용자에게도 노출: route_warning 필드를 사용자 배지/tips와 관리자 모니터링에 공통 사용. 근거: 판정 결과를 숨기면 사용자는 비효율적인 동선을 그대로 따르게 됨. 노출 시 재조정 기능과 자연스럽게 연결되고, 관리자는 집계된 패턴으로 프롬프트를 개선할 수 있어 양쪽 다 이득
 - 기술 스택 확정(v2.2): 프론트 React+MUI+Vite+dnd-kit, 백엔드 NestJS+TypeORM, AI Google Gemini API, 지오코딩 OpenStreetMap Nominatim(+Haversine 직선거리), 배포 Vercel(FE)/Render(BE). 근거: Gemini는 보유 API 키 활용, Nominatim은 무료+국내/해외 목적지 모두 지원해 $10 예산과 목적지 범위 제한 없음 조건을 동시에 충족(Kakao는 해외 미지원, Google Maps는 유료라 제외)
+- 활동 시간대, 동반인, 취향 enum 추가(v2.3): 최초 생성 입력에 activity_time_start/end, companion enum, preferences enum 명시 추가. 근거: AI가 더 맥락 있는 일정을 생성할 수 있고, 사용자별 맞춤형 추천이 가능해짐. 캐시 키에 이 필드들도 포함되어 중복 요청 시 효율성 향상. Phase 2 일정을 1일 연장해도 핵심 기능(부분 재조정)에 영향 없음
 - 목적지 범위 제한 없음: 국내/해외 모두 지원. 근거: 별도 제약 사유가 없어 확장성 있게 설계
 
 ## 16. 오픈 이슈
-- 취향(preferences) 입력 방식: 태그 선택 vs 자유 텍스트 — 화면 설계 시 확정
 - route_warning 배지의 정확한 UI 문구/톤(경고 vs 참고 정보) — 프론트 설계 시 확정
-- ai_response_cache 캐시 키 설계(목적지+기간+예산+취향 해시 방식) 및 만료/정리 정책 — 구현 시 확정
+- ai_response_cache 캐시 키 설계(목적지+기간+예산+동반인+활동시간+취향 해시 방식) 및 만료/정리 정책 — 구현 시 확정

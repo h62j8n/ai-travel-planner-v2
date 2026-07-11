@@ -1,8 +1,8 @@
 # AI 여행 일정 플래너 — ERD (DB 스키마 설계)
 
-- 작성일: 2026-07-06
-- 문서 버전: v1.0
-- 기반 문서: PRD_AI여행플래너.md (v2.1)
+- 작성일: 2026-07-06 (최종 수정: 2026-07-11)
+- 문서 버전: v1.1
+- 기반 문서: PRD_AI여행플래너.md (v2.3)
 - 저장소: Supabase(Postgres) 단일 소스 (Redis 등 별도 캐시 계층 없음)
 
 ## 1. 설계 원칙
@@ -36,6 +36,9 @@ erDiagram
         date end_date
         int duration_days
         text budget_level
+        time activity_time_start
+        time activity_time_end
+        text companion
         text_array preferences
         text summary
         int revision
@@ -115,6 +118,9 @@ erDiagram
 | end_date | date | NOT NULL | 종료일 |
 | duration_days | int | NOT NULL | 총 일수(생성 시 계산해 저장) |
 | budget_level | text | NOT NULL, 최대 30자 | 예산 수준 |
+| activity_time_start | time | NOT NULL | 활동 시간대 시작(HH:MM, 24시간제) |
+| activity_time_end | time | NOT NULL | 활동 시간대 종료(HH:MM, 24시간제) |
+| companion | text | NOT NULL, CHECK (companion IN ('혼자','친구','연인/배우자','아이','부모님','기타')) | 여행 동반인 |
 | preferences | text[] | NOT NULL | 취향 다중 선택 값 |
 | summary | text | NULL 허용 | AI가 생성한 전체 요약 |
 | revision | int | NOT NULL, default 1 | 재조정 반영 횟수 |
@@ -180,7 +186,7 @@ erDiagram
 | 컬럼 | 타입 | 제약 | 설명 |
 |---|---|---|---|
 | id | uuid | PK, default gen_random_uuid() | 식별자 |
-| cache_key | text | UNIQUE, NOT NULL | destination+start_date+end_date+budget_level+preferences 해시값 |
+| cache_key | text | UNIQUE, NOT NULL | destination+start_date+end_date+budget_level+activity_time_start+activity_time_end+companion+preferences 해시값 |
 | request_params | jsonb | NOT NULL | 원본 요청 파라미터(디버깅용) |
 | response_json | jsonb | NOT NULL | 캐시된 AI 응답(§8.3 스키마) |
 | created_at | timestamptz | NOT NULL, default now() | 생성 시각 |

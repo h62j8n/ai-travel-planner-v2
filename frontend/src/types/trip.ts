@@ -48,6 +48,9 @@ export interface TripCreateInput {
   start_date: string;
   end_date: string;
   budget_level: string;
+  activity_time_start: string;
+  activity_time_end: string;
+  companion: string;
   preferences: string[];
 }
 
