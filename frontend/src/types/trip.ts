@@ -10,19 +10,19 @@ export interface RouteWarning {
 
 export interface Activity {
   id: string;
-  time: string;
+  time: string | null;
   title: string;
-  description: string;
+  description: string | null;
   category: string;
-  duration_minutes: number;
-  location: string;
-  estimated_cost: number;
+  duration_minutes: number | null;
+  location: string | null;
+  estimated_cost: number | null;
   tips: string | null;
 }
 
 export interface TripDay {
   day: number;
-  theme: string;
+  theme: string | null;
   activities: Activity[];
   last_modified: boolean;
   route_warning: RouteWarning;
@@ -37,7 +37,7 @@ export interface Trip {
   trip_id: string;
   destination: string;
   duration_days: number;
-  summary: string;
+  summary: string | null;
   days: TripDay[];
   meta: TripMeta;
 }

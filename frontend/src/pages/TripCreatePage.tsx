@@ -65,7 +65,7 @@ function TripCreatePage() {
     setSubmitError(null);
     try {
       const trip = await createTrip(values);
-      navigate(`/trips/${trip.trip_id}`);
+      navigate(`/trips/${trip.trip_id}`, { state: { trip } });
     } catch (error) {
       setSubmitError(
         extractErrorMessage(
