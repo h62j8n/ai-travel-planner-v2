@@ -8,6 +8,7 @@ import { TripRevision } from './entities/trip-revision.entity';
 import { AiResponseCache } from './entities/ai-response-cache.entity';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { ReorderTripDto } from './dto/reorder-trip.dto';
+import { RegenerateDayDto } from './dto/regenerate-day.dto';
 import { TripDayDto, TripResponseDto } from './dto/trip-response.dto';
 import { ItineraryGeneratorService } from './itinerary-generator.service';
 import {
@@ -15,12 +16,18 @@ import {
   ReorderDayInput,
   ReorderedDayResult,
 } from './itinerary-reorder.service';
+import {
+  ItineraryRegenerateService,
+  RegenerateDayInput,
+  RegenerateDayResult,
+} from './itinerary-regenerate.service';
 import { AppException } from '../common/exceptions/app.exception';
 import { buildTripCacheKey } from './utils/cache-key.util';
 import {
   GeneratedActivity,
   GeneratedItinerary,
 } from './interfaces/generated-itinerary.interface';
+import type { Preference } from './constants/trip-options.constants';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -35,6 +42,7 @@ export class TripsService {
     private readonly aiResponseCacheRepository: Repository<AiResponseCache>,
     private readonly itineraryGeneratorService: ItineraryGeneratorService,
     private readonly itineraryReorderService: ItineraryReorderService,
+    private readonly itineraryRegenerateService: ItineraryRegenerateService,
   ) {}
 
   /**
@@ -59,6 +67,66 @@ export class TripsService {
     );
 
     return this.toResponseDto(trip, days);
+  }
+
+  /**
+   * POST /api/trips/{trip_id}/regenerate (PRD §6.2.2, §9 / WBS 2.7)
+   * 1) 원본 trip 로드 및 소유권 확인
+   * 2) 저장된 입력값(destination/기간/예산/활동시간/동반인/취향)은 그대로 유지
+   * 3) ai_response_cache를 조회/저장하지 않고 itineraryGeneratorService.generate()를
+   *    직접 호출(캐시는 최초 생성에만 적용, PRD §6.8)
+   * 4) 결과를 완전히 새로운 Trip row(새 trip_id, revision=1)로 persistTrip()과 동일한
+   *    트랜잭션 로직으로 저장. 원본 trip row는 건드리지 않고 그대로 유지한다.
+   */
+  async regenerate(tripId: string, userId: string): Promise<TripResponseDto> {
+    const trip = await this.tripsRepository.findOne({
+      where: { id: tripId },
+    });
+
+    if (!trip) {
+      throw new AppException(
+        'NOT_FOUND',
+        '여행 일정을 찾을 수 없습니다.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (trip.userId !== userId) {
+      throw new AppException(
+        'FORBIDDEN',
+        '본인 소유의 일정만 재생성할 수 있습니다.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const dto: CreateTripDto = {
+      destination: trip.destination,
+      start_date: trip.startDate,
+      end_date: trip.endDate,
+      budget_level: trip.budgetLevel,
+      activity_time_start:
+        TripsService.normalizeTime(trip.activityTimeStart) ??
+        trip.activityTimeStart,
+      activity_time_end:
+        TripsService.normalizeTime(trip.activityTimeEnd) ??
+        trip.activityTimeEnd,
+      companion: trip.companion,
+      preferences: trip.preferences as Preference[],
+    };
+
+    const itinerary = await this.itineraryGeneratorService.generate(
+      dto,
+      trip.durationDays,
+    );
+
+    const { trip: newTrip, days } = await this.persistTrip(
+      dto,
+      userId,
+      trip.durationDays,
+      itinerary,
+    );
+
+    return this.toResponseDto(newTrip, days);
   }
 
   /**
@@ -175,6 +243,107 @@ export class TripsService {
   }
 
   /**
+   * PATCH /api/trips/{trip_id}/regenerate-day (PRD §6.3.2, §9 / WBS 2.8)
+   * 1) 소유권/day 범위 검증(reorder()와 동일 방식)
+   * 2) 다른 day들의 활동(title/location)을 프롬프트 입력에 포함해 중복 방지
+   *    (ItineraryRegenerateService, ai-specialist 담당)
+   * 3) 대상 day의 활동만 삭제 후 새로 insert, 다른 day/activity 행은 절대 건드리지 않는다
+   *    (핵심 불변 규칙). revision 증가, 스냅샷 저장은 persistReorder()와 동일 패턴
+   * 4) ai_response_cache는 조회/저장하지 않는다(PRD §6.8, 최초 생성 전용)
+   */
+  async regenerateDay(
+    tripId: string,
+    dto: RegenerateDayDto,
+    userId: string,
+  ): Promise<TripResponseDto> {
+    const trip = await this.tripsRepository.findOne({
+      where: { id: tripId },
+      relations: { itineraryDays: { activities: true } },
+    });
+
+    if (!trip) {
+      throw new AppException(
+        'NOT_FOUND',
+        '여행 일정을 찾을 수 없습니다.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (trip.userId !== userId) {
+      throw new AppException(
+        'FORBIDDEN',
+        '본인 소유의 일정만 재생성할 수 있습니다.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    if (dto.day < 1 || dto.day > trip.durationDays) {
+      throw new AppException(
+        'VALIDATION_ERROR',
+        `day는 1~${trip.durationDays} 범위여야 합니다.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const allDays = (trip.itineraryDays ?? [])
+      .slice()
+      .sort((a, b) => a.dayNumber - b.dayNumber);
+    const targetDay = allDays.find((day) => day.dayNumber === dto.day);
+
+    if (!targetDay) {
+      throw new AppException(
+        'VALIDATION_ERROR',
+        '해당 일차의 일정 데이터를 찾을 수 없습니다.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const otherDays = allDays.filter((day) => day.dayNumber !== dto.day);
+
+    const regenerateInput: RegenerateDayInput = {
+      destination: trip.destination,
+      budgetLevel: trip.budgetLevel,
+      activityTimeStart:
+        TripsService.normalizeTime(trip.activityTimeStart) ??
+        trip.activityTimeStart,
+      activityTimeEnd:
+        TripsService.normalizeTime(trip.activityTimeEnd) ??
+        trip.activityTimeEnd,
+      companion: trip.companion,
+      preferences: trip.preferences,
+      durationDays: trip.durationDays,
+      targetDay: {
+        dayNumber: targetDay.dayNumber,
+        theme: targetDay.theme ?? '',
+      },
+      otherDays: otherDays.map((day) => ({
+        dayNumber: day.dayNumber,
+        theme: day.theme ?? '',
+        activities: (day.activities ?? [])
+          .slice()
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((activity) => ({
+            title: activity.title,
+            location: activity.location ?? '',
+          })),
+      })),
+    };
+
+    const result =
+      await this.itineraryRegenerateService.regenerateDay(regenerateInput);
+
+    const { trip: updatedTrip, days } = await this.persistRegenerateDay(
+      trip,
+      allDays,
+      targetDay,
+      dto.day,
+      result,
+    );
+
+    return this.toResponseDto(updatedTrip, days, dto.day);
+  }
+
+  /**
    * 대상 ItineraryDay와 그 소속 ItineraryActivity 행만 갱신한다.
    * 다른 day는 절대 조회/수정하지 않는다(핵심 불변 규칙).
    */
@@ -258,6 +427,91 @@ export class TripsService {
       }
       this.logger.error(
         `trips 재조정 저장 실패: ${String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new AppException(
+        'STORAGE_ERROR',
+        '일정을 저장하는 중 오류가 발생했습니다.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * 대상 ItineraryDay의 기존 활동 행을 삭제하고 결과로 새로 insert한다.
+   * 다른 day/activity 행은 절대 조회/수정/삭제하지 않는다(핵심 불변 규칙).
+   */
+  private async persistRegenerateDay(
+    trip: Trip,
+    allDays: ItineraryDay[],
+    targetDay: ItineraryDay,
+    changedDayNumber: number,
+    result: RegenerateDayResult,
+  ): Promise<{ trip: Trip; days: ItineraryDay[] }> {
+    try {
+      return await this.tripsRepository.manager.transaction(async (manager) => {
+        const existingActivityIds = (targetDay.activities ?? []).map(
+          (activity) => activity.id,
+        );
+        if (existingActivityIds.length > 0) {
+          await manager.delete(ItineraryActivity, existingActivityIds);
+        }
+
+        const newActivityEntities = result.activities.map((activity, index) =>
+          manager.create(ItineraryActivity, {
+            itineraryDayId: targetDay.id,
+            activityKey: activity.id,
+            orderIndex: index,
+            time: activity.time,
+            title: activity.title,
+            description: activity.description,
+            category: activity.category,
+            durationMinutes: activity.durationMinutes,
+            location: activity.location,
+            estimatedCost: activity.estimatedCost,
+            tips: activity.tips,
+          }),
+        );
+
+        const savedActivities = await manager.save(
+          ItineraryActivity,
+          newActivityEntities,
+        );
+
+        targetDay.theme = result.theme;
+        targetDay.routeWarningFlagged = result.routeWarning.flagged;
+        targetDay.routeWarningReason = result.routeWarning.reason;
+        targetDay.lastModifiedAt = new Date();
+        targetDay.activities = savedActivities;
+
+        const savedDay = await manager.save(ItineraryDay, targetDay);
+
+        trip.revision += 1;
+        const savedTrip = await manager.save(Trip, trip);
+
+        const otherDays = allDays.filter(
+          (day) => day.dayNumber !== changedDayNumber,
+        );
+        const updatedAllDays = [...otherDays, savedDay];
+
+        await manager.save(
+          TripRevision,
+          manager.create(TripRevision, {
+            tripId: savedTrip.id,
+            revisionNumber: savedTrip.revision,
+            changedDayNumber,
+            daysSnapshot: this.toResponseDays(updatedAllDays, changedDayNumber),
+          }),
+        );
+
+        return { trip: savedTrip, days: updatedAllDays };
+      });
+    } catch (error) {
+      if (error instanceof AppException) {
+        throw error;
+      }
+      this.logger.error(
+        `trips 일자별 활동 교체 저장 실패: ${String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new AppException(

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
 import {
   Alert,
   Backdrop,
@@ -7,6 +8,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Grid,
   Paper,
   Snackbar,
@@ -15,7 +21,7 @@ import {
 } from '@mui/material';
 
 import { extractErrorMessage } from '../api/authApi';
-import { reorderTrip } from '../api/tripApi';
+import { regenerateDayActivities, regenerateTrip, reorderTrip } from '../api/tripApi';
 import DayCard from '../components/trip/DayCard';
 import type { Activity, Trip } from '../types/trip';
 
@@ -47,6 +53,9 @@ function TripItineraryPage() {
   const [trip, setTrip] = useState<Trip | undefined>(initialTrip);
   const [pendingDays, setPendingDays] = useState<ReadonlySet<number>>(new Set());
   const [reorderingDay, setReorderingDay] = useState<number | null>(null);
+  const [regeneratingDay, setRegeneratingDay] = useState<number | null>(null);
+  const [regeneratingTrip, setRegeneratingTrip] = useState(false);
+  const [regenerateTripDialogOpen, setRegenerateTripDialogOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   if (!trip) {
@@ -116,6 +125,66 @@ function TripItineraryPage() {
     }
   };
 
+  // day별 "활동 재생성" 확인 다이얼로그에서 최종 확인 시 호출된다(PRD 6.3.2).
+  // 응답은 Trip 전체이며 해당 day만 last_modified:true로 교체되고 다른 day는 서버가 그대로 유지해
+  // 반환하므로, reorder와 동일하게 응답을 그대로 신뢰해 로컬 trip state 전체를 교체한다.
+  const handleRequestRegenerateDay = async (dayNumber: number) => {
+    if (!trip) return;
+
+    setRegeneratingDay(dayNumber);
+    try {
+      const updatedTrip = await regenerateDayActivities(trip.trip_id, dayNumber);
+      setTrip(updatedTrip);
+      setPendingDays((prev) => {
+        if (!prev.has(dayNumber)) return prev;
+        const next = new Set(prev);
+        next.delete(dayNumber);
+        return next;
+      });
+      setToast({
+        message: `Day ${dayNumber} 활동을 새로 생성했어요 (revision ${updatedTrip.meta.revision})`,
+        severity: 'success',
+      });
+    } catch (error) {
+      setToast({
+        message: extractErrorMessage(
+          error,
+          '활동 재생성 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+        ),
+        severity: 'error',
+      });
+    } finally {
+      setRegeneratingDay(null);
+    }
+  };
+
+  // 헤더 "전체 재생성" 확인 다이얼로그에서 최종 확인 시 호출된다(PRD 6.2.2).
+  // 입력 조건은 서버가 원본 trip 기준으로 유지하고 AI만 새로 호출하며(캐시 무시),
+  // 응답은 **새로운** trip_id를 가진 별도 Trip이다. 기존 trip은 저장 목록에 그대로 남으므로
+  // 새 trip_id로 일정표 화면을 다시 진입시킨다(TripCreatePage의 성공 후 navigate 패턴과 동일).
+  const handleRegenerateTrip = async () => {
+    if (!trip) return;
+
+    setRegeneratingTrip(true);
+    try {
+      const newTrip = await regenerateTrip(trip.trip_id);
+      navigate(`/trips/${newTrip.trip_id}`, { state: { trip: newTrip } });
+    } catch (error) {
+      setToast({
+        message: extractErrorMessage(
+          error,
+          '일정 전체 재생성에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+        ),
+        severity: 'error',
+      });
+    } finally {
+      setRegeneratingTrip(false);
+    }
+  };
+
+  const isAnyActionInProgress =
+    reorderingDay !== null || regeneratingDay !== null || regeneratingTrip;
+
   return (
     <Stack spacing={3}>
       <Paper variant="outlined" sx={{ p: 3 }}>
@@ -144,9 +213,26 @@ function TripItineraryPage() {
               </Typography>
             )}
           </Box>
-          <Button variant="outlined" onClick={() => navigate('/trips')}>
-            목록으로
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              color="error"
+              disabled={isAnyActionInProgress}
+              startIcon={
+                regeneratingTrip ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <AutorenewIcon fontSize="small" />
+                )
+              }
+              onClick={() => setRegenerateTripDialogOpen(true)}
+            >
+              전체 재생성
+            </Button>
+            <Button variant="outlined" onClick={() => navigate('/trips')}>
+              목록으로
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -165,18 +251,58 @@ function TripItineraryPage() {
               onReorder={handleReorder}
               onRequestReorder={handleRequestReorder}
               isReordering={reorderingDay === day.day}
+              onRequestRegenerateDay={handleRequestRegenerateDay}
+              isRegeneratingDay={regeneratingDay === day.day}
+              disableActions={
+                isAnyActionInProgress &&
+                reorderingDay !== day.day &&
+                regeneratingDay !== day.day
+              }
             />
           </Grid>
         ))}
       </Grid>
 
+      <Dialog
+        open={regenerateTripDialogOpen}
+        onClose={() => setRegenerateTripDialogOpen(false)}
+        aria-labelledby="regenerate-trip-dialog-title"
+      >
+        <DialogTitle id="regenerate-trip-dialog-title">일정 전체를 재생성할까요?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            목적지·기간·예산·취향 등 입력 조건은 유지한 채 AI가 완전히 새로운 일정을 만들어요.
+            현재 일정은 저장 목록에 그대로 유지되고, 새 일정이 별도로 생성됩니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRegenerateTripDialogOpen(false)}>취소</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setRegenerateTripDialogOpen(false);
+              handleRegenerateTrip();
+            }}
+          >
+            재생성
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Backdrop
-        open={reorderingDay !== null}
+        open={reorderingDay !== null || regeneratingDay !== null || regeneratingTrip}
         sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
       >
         <Stack spacing={2} sx={{ alignItems: 'center' }}>
           <CircularProgress color="inherit" />
-          <Typography variant="body2">AI가 동선을 재조정하는 중...</Typography>
+          <Typography variant="body2">
+            {regeneratingTrip
+              ? 'AI가 새로운 일정을 생성하는 중...'
+              : regeneratingDay !== null
+                ? `AI가 Day ${regeneratingDay} 활동을 새로 생성하는 중...`
+                : 'AI가 동선을 재조정하는 중...'}
+          </Typography>
         </Stack>
       </Backdrop>
 

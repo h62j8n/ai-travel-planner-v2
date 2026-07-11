@@ -4,6 +4,7 @@ import { TripsController } from './trips.controller';
 import { TripsService } from './trips.service';
 import { ItineraryGeneratorService } from './itinerary-generator.service';
 import { ItineraryReorderService } from './itinerary-reorder.service';
+import { ItineraryRegenerateService } from './itinerary-regenerate.service';
 import { GeminiClientService } from './gemini/gemini-client.service';
 import { NominatimClientService } from './geocoding/nominatim-client.service';
 import { Trip } from './entities/trip.entity';
@@ -27,6 +28,7 @@ import { AiResponseCache } from './entities/ai-response-cache.entity';
     TripsService,
     ItineraryGeneratorService,
     ItineraryReorderService,
+    ItineraryRegenerateService,
     GeminiClientService,
     NominatimClientService,
   ],

@@ -16,6 +16,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   Alert,
@@ -26,6 +27,11 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Stack,
   Typography,
 } from '@mui/material';
@@ -43,6 +49,12 @@ interface DayCardProps {
   onRequestReorder: (dayNumber: number, activities: Activity[]) => void;
   /** 이 day에 대한 재조정 요청이 진행 중인지 여부 (버튼 비활성화 + 로딩 표시용). */
   isReordering: boolean;
+  /** "활동 재생성" 확인 다이얼로그에서 최종 확인 시 호출 — PATCH /trips/{id}/regenerate-day 트리거. */
+  onRequestRegenerateDay: (dayNumber: number) => void;
+  /** 이 day에 대한 활동 재생성 요청이 진행 중인지 여부 (버튼 비활성화 + 로딩 표시용). */
+  isRegeneratingDay: boolean;
+  /** 다른 day의 재조정/재생성이 진행 중일 때 이 카드의 액션 버튼을 모두 비활성화하기 위한 플래그. */
+  disableActions: boolean;
 }
 
 /**
@@ -51,8 +63,18 @@ interface DayCardProps {
  * - 드래그는 이 카드가 소유한 DndContext/SortableContext 안에서만 동작하므로 다른 day에는 영향이 없다.
  * - 드래그 자체는 로컬 상태만 바꾸고, 실제 서버 재조정 요청은 버튼 클릭 시에만 발생한다.
  */
-function DayCard({ day, pending, onReorder, onRequestReorder, isReordering }: DayCardProps) {
+function DayCard({
+  day,
+  pending,
+  onReorder,
+  onRequestReorder,
+  isReordering,
+  onRequestRegenerateDay,
+  isRegeneratingDay,
+  disableActions,
+}: DayCardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -151,7 +173,7 @@ function DayCard({ day, pending, onReorder, onRequestReorder, isReordering }: Da
             color="secondary"
             size="small"
             fullWidth
-            disabled={!pending || isReordering}
+            disabled={!pending || isReordering || disableActions}
             startIcon={isReordering ? <CircularProgress size={16} color="inherit" /> : undefined}
             onClick={() => onRequestReorder(day.day, day.activities)}
           >
@@ -164,15 +186,64 @@ function DayCard({ day, pending, onReorder, onRequestReorder, isReordering }: Da
               color="primary"
               size="small"
               fullWidth
-              disabled={isReordering}
+              disabled={isReordering || disableActions}
               startIcon={isReordering ? <CircularProgress size={16} color="inherit" /> : undefined}
               onClick={() => onRequestReorder(day.day, day.activities)}
             >
               동선 최적화 재요청
             </Button>
           )}
+
+          {/* PRD 6.3.2: day 전체 활동을 새로 교체하는, 순서 변경보다 파괴적인 액션이므로
+              색상(error)으로 시각적으로 구분하고 확인 다이얼로그를 거친다. */}
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            fullWidth
+            disabled={isRegeneratingDay || disableActions}
+            startIcon={
+              isRegeneratingDay ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <AutorenewIcon fontSize="small" />
+              )
+            }
+            onClick={() => setRegenerateDialogOpen(true)}
+          >
+            활동 재생성
+          </Button>
         </Stack>
       </CardContent>
+
+      <Dialog
+        open={regenerateDialogOpen}
+        onClose={() => setRegenerateDialogOpen(false)}
+        aria-labelledby={`regenerate-day-${day.day}-dialog-title`}
+      >
+        <DialogTitle id={`regenerate-day-${day.day}-dialog-title`}>
+          Day {day.day} 활동을 재생성할까요?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Day {day.day}의 활동이 모두 새로 교체됩니다. 다른 day는 그대로 유지되며, 되돌릴 수
+            없습니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRegenerateDialogOpen(false)}>취소</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setRegenerateDialogOpen(false);
+              onRequestRegenerateDay(day.day);
+            }}
+          >
+            재생성
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }
