@@ -1,32 +1,41 @@
+import type { DraggableAttributes } from '@dnd-kit/core';
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
+import type { CSSProperties } from 'react';
 
 import type { Activity } from '../../types/trip';
 
-interface SortableActivityItemProps {
+interface ActivityDragHandleProps {
+  attributes?: DraggableAttributes;
+  listeners?: SyntheticListenerMap;
+}
+
+interface ActivityCardProps {
   activity: Activity;
+  isDragging?: boolean;
+  dragHandleProps?: ActivityDragHandleProps;
+  containerRef?: (node: HTMLElement | null) => void;
+  style?: CSSProperties;
 }
 
 /**
- * Day 카드 내 활동 1건.
- * dnd-kit useSortable로 같은 day(SortableContext) 내에서만 드래그 순서 변경이 가능하다.
+ * 활동 1건의 순수 표시용 카드.
+ * SortableActivityItem(같은 day 내 드래그 정렬)과 DragOverlay(커서를 따라다니는 프리뷰)
+ * 양쪽에서 재사용한다 — DragOverlay 쪽은 dragHandleProps/containerRef 없이 정적으로 렌더링된다.
  */
-function SortableActivityItem({ activity }: SortableActivityItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: activity.id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
+export function ActivityCard({
+  activity,
+  isDragging = false,
+  dragHandleProps,
+  containerRef,
+  style,
+}: ActivityCardProps) {
   return (
     <Paper
-      ref={setNodeRef}
+      ref={containerRef}
       style={style}
       variant="outlined"
       sx={{
@@ -36,11 +45,12 @@ function SortableActivityItem({ activity }: SortableActivityItemProps) {
         gap: 1.5,
         borderColor: isDragging ? 'primary.main' : 'divider',
         bgcolor: 'background.paper',
+        boxShadow: isDragging ? 4 : 0,
       }}
     >
       <Box
-        {...attributes}
-        {...listeners}
+        {...(dragHandleProps?.attributes ?? {})}
+        {...(dragHandleProps?.listeners ?? {})}
         sx={{
           display: 'flex',
           alignItems: 'center',
@@ -110,6 +120,36 @@ function SortableActivityItem({ activity }: SortableActivityItemProps) {
         )}
       </Box>
     </Paper>
+  );
+}
+
+interface SortableActivityItemProps {
+  activity: Activity;
+}
+
+/**
+ * Day 카드 내 활동 1건.
+ * dnd-kit useSortable로 같은 day(SortableContext) 내에서만 드래그 순서 변경이 가능하다.
+ */
+function SortableActivityItem({ activity }: SortableActivityItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: activity.id,
+  });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <ActivityCard
+      activity={activity}
+      isDragging={isDragging}
+      dragHandleProps={{ attributes, listeners }}
+      containerRef={setNodeRef}
+      style={style}
+    />
   );
 }
 
