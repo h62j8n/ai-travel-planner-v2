@@ -168,17 +168,19 @@ function DayCard({
         </DndContext>
 
         <Stack spacing={1} sx={{ mt: 2 }}>
-          <Button
-            variant="contained"
-            color="secondary"
-            size="small"
-            fullWidth
-            disabled={!pending || isReordering || disableActions}
-            startIcon={isReordering ? <CircularProgress size={16} color="inherit" /> : undefined}
-            onClick={() => onRequestReorder(day.day, day.activities)}
-          >
-            재조정 요청
-          </Button>
+          {pending && (
+            <Button
+              variant="contained"
+              color="secondary"
+              size="small"
+              fullWidth
+              disabled={isReordering || disableActions}
+              startIcon={isReordering ? <CircularProgress size={16} color="inherit" /> : undefined}
+              onClick={() => onRequestReorder(day.day, day.activities)}
+            >
+              재조정 요청
+            </Button>
+          )}
 
           {day.route_warning.flagged && (
             <Button

@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 
 import { login, extractErrorMessage } from '../../api/authApi';
+import { getTrips } from '../../api/tripApi';
 import { saveSession } from '../../auth/authStorage';
 import { loginSchema, type LoginFormValues } from '../../auth/authSchemas';
 
@@ -41,7 +42,18 @@ function LoginPage() {
     try {
       const auth = await login(values);
       saveSession(auth);
-      navigate('/trips/new', { replace: true });
+
+      // 저장된 여행이 있으면 목록으로, 없으면 새 일정 만들기로 이동한다.
+      // 목록 조회 자체가 실패해도 로그인은 이미 성공했으므로 안전한 기본값(새 일정 만들기)으로 이동한다.
+      let hasSavedTrips = false;
+      try {
+        const trips = await getTrips();
+        hasSavedTrips = trips.length > 0;
+      } catch {
+        hasSavedTrips = false;
+      }
+
+      navigate(hasSavedTrips ? '/trips' : '/trips/new', { replace: true });
     } catch (error) {
       setSubmitError(
         extractErrorMessage(error, '로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.'),

@@ -38,6 +38,7 @@ export interface Trip {
   destination: string;
   duration_days: number;
   summary: string | null;
+  preferences: string[];
   days: TripDay[];
   meta: TripMeta;
 }
@@ -65,16 +66,16 @@ export interface TripReorderInput {
  * GET /trips (PRD 9절 "내 저장 목록(최신순)") 응답 아이템.
  * backend/src/trips/dto/trip-list-item.dto.ts와 1:1 대응하는 카드 전용 경량 스키마.
  * days/activities 상세는 포함하지 않는다 — 상세는 GET /trips/{trip_id}(TripResponseDto)에서 조회한다.
- * flagged_days_count는 route_warning.flagged=true인 day 수(0이면 "동선 주의" 뱃지 미표시).
+ * flagged_days_count는 route_warning.flagged=true인 day 수. 목록 카드 UI에서는 사용하지 않는다
+ * (상세 화면 DayCard에서 day별로 이미 노출됨).
+ * duration_days는 목록 카드에 노출하지 않으므로 이 타입에 포함하지 않는다(상세 스키마인 Trip에는 유지).
  */
 export interface TripListItem {
   trip_id: string;
   destination: string;
   start_date: string;
   end_date: string;
-  duration_days: number;
-  preferences: string[];
-  revision: number;
+  summary: string | null;
   flagged_days_count: number;
   created_at: string;
   updated_at: string;

@@ -8,9 +8,7 @@ import {
   Button,
   Card,
   CardActionArea,
-  CardActions,
   CardContent,
-  Chip,
   CircularProgress,
   FormControl,
   Grid,
@@ -36,8 +34,9 @@ import type { TripListItem } from '../types/trip';
  * 표시한다. 목록 응답은 days를 포함하지 않는 경량 스키마이므로, 카드 클릭 시에는 trip_id로만
  * 이동하고 상세 데이터는 TripItineraryPage가 GET /trips/{id}로 직접 조회한다.
  *
- * route_warning.flagged=true인 day는 관리자 전용 정보가 아니므로 "동선 주의 N일" 칩으로 즉시
- * 노출한다(CLAUDE.md 핵심 불변 규칙).
+ * route_warning.flagged=true인 day는 관리자 전용 정보가 아니므로 즉시 노출한다(CLAUDE.md 핵심
+ * 불변 규칙). 목록 카드에서는 별도 배지를 두지 않고, 상세 화면(TripItineraryPage/DayCard)의
+ * day별 Alert + "동선 최적화 재요청" 버튼으로 노출한다.
  */
 function SavedTripsPage() {
   const navigate = useNavigate();
@@ -178,47 +177,40 @@ function SavedTripsPage() {
             <Grid container spacing={2}>
               {filteredTrips.map((trip) => (
                   <Grid key={trip.trip_id} size={{ xs: 12, sm: 6, md: 4 }}>
-                    <Card variant="outlined" sx={{ height: '100%' }}>
-                      <CardActionArea onClick={() => handleOpenTrip(trip)}>
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        height: '100%',
+                        transition: 'box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease',
+                        '&:hover': {
+                          boxShadow: 4,
+                          transform: 'translateY(-3px)',
+                          borderColor: 'primary.main',
+                        },
+                      }}
+                    >
+                      <CardActionArea
+                        onClick={() => handleOpenTrip(trip)}
+                        sx={{ height: '100%', alignItems: 'flex-start' }}
+                      >
                         <CardContent>
                           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                             {trip.destination}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {trip.start_date} ~ {trip.end_date}
-                          </Typography>
-
-                          <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
-                            <Chip
-                              label={`revision ${trip.revision}`}
-                              size="small"
-                              color="primary"
-                            />
-                            {trip.flagged_days_count > 0 && (
-                              <Chip
-                                label={`동선 주의 ${trip.flagged_days_count}일`}
-                                size="small"
-                                color="warning"
-                              />
-                            )}
-                          </Stack>
-
-                          {trip.preferences && trip.preferences.length > 0 && (
+                          {trip.summary && (
                             <Typography
-                              variant="caption"
+                              variant="body2"
                               color="text.secondary"
-                              sx={{ display: 'block', mt: 1.5 }}
+                              sx={{ mt: 0.5 }}
                             >
-                              취향: {trip.preferences.join(', ')}
+                              {trip.summary}
                             </Typography>
                           )}
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                            {trip.start_date} ~ {trip.end_date}
+                          </Typography>
                         </CardContent>
                       </CardActionArea>
-                      <CardActions sx={{ justifyContent: 'flex-end' }}>
-                        <Button size="small" variant="outlined" onClick={() => handleOpenTrip(trip)}>
-                          상세보기
-                        </Button>
-                      </CardActions>
                     </Card>
                   </Grid>
               ))}

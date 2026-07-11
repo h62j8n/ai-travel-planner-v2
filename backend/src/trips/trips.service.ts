@@ -86,11 +86,9 @@ export class TripsService {
       .leftJoin('trip.itineraryDays', 'day')
       .select('trip.id', 'tripId')
       .addSelect('trip.destination', 'destination')
-      .addSelect('trip.startDate', 'startDate')
-      .addSelect('trip.endDate', 'endDate')
-      .addSelect('trip.durationDays', 'durationDays')
-      .addSelect('trip.preferences', 'preferences')
-      .addSelect('trip.revision', 'revision')
+      .addSelect("to_char(trip.startDate, 'YYYY-MM-DD')", 'startDate')
+      .addSelect("to_char(trip.endDate, 'YYYY-MM-DD')", 'endDate')
+      .addSelect('trip.summary', 'summary')
       .addSelect('trip.createdAt', 'createdAt')
       .addSelect('trip.updatedAt', 'updatedAt')
       .addSelect(
@@ -105,9 +103,7 @@ export class TripsService {
         destination: string;
         startDate: string;
         endDate: string;
-        durationDays: number;
-        preferences: string[];
-        revision: number;
+        summary: string | null;
         createdAt: Date;
         updatedAt: Date;
         flaggedDaysCount: string;
@@ -118,9 +114,7 @@ export class TripsService {
       destination: row.destination,
       start_date: row.startDate,
       end_date: row.endDate,
-      duration_days: row.durationDays,
-      preferences: row.preferences,
-      revision: row.revision,
+      summary: row.summary,
       flagged_days_count: Number(row.flaggedDaysCount),
       created_at: new Date(row.createdAt).toISOString(),
       updated_at: new Date(row.updatedAt).toISOString(),
@@ -822,6 +816,7 @@ export class TripsService {
       destination: trip.destination,
       duration_days: trip.durationDays,
       summary: trip.summary,
+      preferences: trip.preferences,
       days: this.toResponseDays(days, changedDayNumber),
       meta: {
         generated_at: new Date().toISOString(),

@@ -98,6 +98,13 @@ export class TripResponseDto {
   @ApiProperty({ example: '부산 2박 3일 힐링+먹방 일정', nullable: true })
   summary: string | null;
 
+  @ApiProperty({
+    example: ['힐링', '먹방'],
+    type: [String],
+    description: '여행 생성 시 선택한 취향 목록',
+  })
+  preferences: string[];
+
   @ApiProperty({ type: [TripDayDto] })
   days: TripDayDto[];
 

@@ -254,6 +254,13 @@ function TripItineraryPage() {
                 {trip.summary}
               </Typography>
             )}
+            {trip.preferences.length > 0 && (
+              <Stack direction="row" spacing={0.5} sx={{ mt: 1, rowGap: 0.5, flexWrap: 'wrap' }}>
+                {trip.preferences.map((preference) => (
+                  <Chip key={preference} label={preference} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            )}
           </Box>
           <Stack direction="row" spacing={1}>
             <Button
