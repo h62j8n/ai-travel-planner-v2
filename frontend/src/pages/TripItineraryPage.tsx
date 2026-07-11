@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import {
   Alert,
@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 
 import { extractErrorMessage } from '../api/authApi';
-import { regenerateDayActivities, regenerateTrip, reorderTrip } from '../api/tripApi';
+import { getTrip, regenerateDayActivities, regenerateTrip, reorderTrip } from '../api/tripApi';
 import DayCard from '../components/trip/DayCard';
 import type { Activity, Trip } from '../types/trip';
 
@@ -38,9 +38,9 @@ interface ToastState {
  * 일정표 (사용자)
  * PRD 6.3, 6.5, 8.3, 11절 / docs/wireframe/일정표_와이어프레임.html 참고
  *
- * 현재 백엔드에는 GET /trips/:id 단건 조회가 없으므로, 일정 생성 직후
- * TripCreatePage가 navigate state로 넘겨준 Trip 객체를 그대로 표시한다.
- * 새로고침/직접 URL 접근 등으로 state가 없으면 안내 화면을 보여준다.
+ * 일정 생성/재조정 직후에는 navigate state로 넘겨준 Trip 객체를 그대로 표시하고,
+ * 저장 목록 카드 클릭이나 새로고침/직접 URL 접근처럼 state가 없는 경우에는
+ * GET /trips/:id로 상세를 조회한다. 조회 실패(404/403 등)면 안내 화면을 보여준다.
  *
  * "결과 표시 + 같은 day 내 드래그 순서 변경(로컬)" + "재조정 요청(PATCH /trips/{id}/reorder)"까지 다룬다.
  * 드래그는 로컬 상태만 바꾸고, 실제 서버 재조정은 day별 버튼 클릭 시에만 호출한다(비용/UX상 명시적 트리거).
@@ -48,9 +48,12 @@ interface ToastState {
 function TripItineraryPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { tripId } = useParams<{ tripId: string }>();
   const initialTrip = (location.state as TripLocationState | null)?.trip;
 
   const [trip, setTrip] = useState<Trip | undefined>(initialTrip);
+  const [loadingTrip, setLoadingTrip] = useState(!initialTrip);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingDays, setPendingDays] = useState<ReadonlySet<number>>(new Set());
   const [reorderingDay, setReorderingDay] = useState<number | null>(null);
   const [regeneratingDay, setRegeneratingDay] = useState<number | null>(null);
@@ -58,13 +61,52 @@ function TripItineraryPage() {
   const [regenerateTripDialogOpen, setRegenerateTripDialogOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  // navigate state로 받은 trip이 없을 때만(목록 카드 클릭, 새로고침 등) GET /trips/:id로 조회한다.
+  useEffect(() => {
+    if (initialTrip || !tripId) {
+      return;
+    }
+    let cancelled = false;
+    setLoadingTrip(true);
+    getTrip(tripId)
+      .then((fetched) => {
+        if (!cancelled) setTrip(fetched);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLoadError(
+            extractErrorMessage(error, '일정 정보를 불러오지 못했습니다.'),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTrip(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // initialTrip은 최초 렌더 기준으로만 판단하면 되므로 의존성에서 제외한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId]);
+
+  if (loadingTrip) {
+    return (
+      <Stack spacing={2} sx={{ alignItems: 'center', mt: 6 }}>
+        <CircularProgress size={32} />
+        <Typography variant="body2" color="text.secondary">
+          일정을 불러오는 중...
+        </Typography>
+      </Stack>
+    );
+  }
+
   if (!trip) {
     return (
       <Stack spacing={2} sx={{ maxWidth: 480, mx: 'auto', textAlign: 'center', mt: 6 }}>
         <Typography variant="h6">일정 정보를 찾을 수 없습니다</Typography>
         <Typography variant="body2" color="text.secondary">
-          새로고침했거나 잘못된 경로로 접근한 경우 일정 데이터가 남아있지 않아요. 새 일정을
-          만들어 주세요.
+          {loadError ??
+            '새로고침했거나 잘못된 경로로 접근한 경우 일정 데이터가 남아있지 않아요. 새 일정을 만들어 주세요.'}
         </Typography>
         <Button variant="contained" color="secondary" onClick={() => navigate('/trips/new')}>
           새 일정 만들기로 이동

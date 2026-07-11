@@ -60,3 +60,22 @@ export interface TripReorderInput {
   day: number;
   new_activity_order: string[];
 }
+
+/**
+ * GET /trips (PRD 9절 "내 저장 목록(최신순)") 응답 아이템.
+ * backend/src/trips/dto/trip-list-item.dto.ts와 1:1 대응하는 카드 전용 경량 스키마.
+ * days/activities 상세는 포함하지 않는다 — 상세는 GET /trips/{trip_id}(TripResponseDto)에서 조회한다.
+ * flagged_days_count는 route_warning.flagged=true인 day 수(0이면 "동선 주의" 뱃지 미표시).
+ */
+export interface TripListItem {
+  trip_id: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  duration_days: number;
+  preferences: string[];
+  revision: number;
+  flagged_days_count: number;
+  created_at: string;
+  updated_at: string;
+}

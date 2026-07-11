@@ -32,6 +32,9 @@ function AppLayout() {
           </Typography>
           {user && (
             <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <Button color="inherit" onClick={() => navigate('/trips')}>
+                저장한 여행
+              </Button>
               <Typography variant="body2">{user.email}</Typography>
               <Button color="inherit" onClick={handleLogout}>
                 로그아웃

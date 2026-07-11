@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -21,6 +22,7 @@ import { CreateTripDto } from './dto/create-trip.dto';
 import { ReorderTripDto } from './dto/reorder-trip.dto';
 import { RegenerateDayDto } from './dto/regenerate-day.dto';
 import { TripResponseDto } from './dto/trip-response.dto';
+import { TripListItemDto } from './dto/trip-list-item.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
@@ -34,6 +36,49 @@ import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.in
 @Controller('trips')
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: '내 저장 목록 조회 (최신순, updated_at DESC)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      '로그인한 사용자 소유의 trip만 반환. 목록 카드용 경량 스키마(day/activity 상세 제외)이며, ' +
+      '각 trip의 flagged_days_count로 route_warning(flagged) 존재 여부를 노출한다. 저장된 여행이 없으면 빈 배열([])',
+    type: TripListItemDto,
+    isArray: true,
+  })
+  @ApiResponse({ status: 401, description: 'AUTH_ERROR - 인증 필요' })
+  findAll(@CurrentUser() user: AuthenticatedUser): Promise<TripListItemDto[]> {
+    return this.tripsService.findAll(user.userId);
+  }
+
+  @Get(':tripId')
+  @ApiOperation({
+    summary: '저장된 일정 상세 조회 (목록 카드 클릭 시 진입)',
+  })
+  @ApiParam({ name: 'tripId', description: '여행 식별자(trips.id)' })
+  @ApiResponse({
+    status: 200,
+    description: 'PRD §8.3 스키마 전체 반환(days/activities 포함)',
+    type: TripResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'AUTH_ERROR - 인증 필요' })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN - 본인 소유가 아닌 일정 조회 요청',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'NOT_FOUND - 존재하지 않는 trip_id',
+  })
+  findOne(
+    @Param('tripId') tripId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TripResponseDto> {
+    return this.tripsService.findOne(tripId, user.userId);
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)

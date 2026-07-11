@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Trip, TripCreateInput } from '../types/trip';
+import type { Trip, TripCreateInput, TripListItem } from '../types/trip';
 
 /**
  * backend/src/trips/trips.controller.ts 계약 (PRD 9절):
@@ -9,6 +9,25 @@ import type { Trip, TripCreateInput } from '../types/trip';
  */
 export async function createTrip(input: TripCreateInput): Promise<Trip> {
   const { data } = await apiClient.post<Trip>('/trips', input);
+  return data;
+}
+
+/**
+ * GET /trips (PRD 9절 "내 저장 목록(최신순)"):
+ * 백엔드가 updated_at DESC로 정렬해 내려주므로 프론트에서 별도 재정렬은 하지 않는다.
+ * days/activities는 포함하지 않는 카드 전용 경량 응답이다(TripListItem 참고).
+ */
+export async function getTrips(): Promise<TripListItem[]> {
+  const { data } = await apiClient.get<TripListItem[]>('/trips');
+  return data;
+}
+
+/**
+ * GET /trips/{trip_id} (PRD 9절 "저장된 일정 상세"):
+ * 목록 카드 클릭 시 조회하는 상세 전체(days/activities 포함, §8.3 스키마).
+ */
+export async function getTrip(tripId: string): Promise<Trip> {
+  const { data } = await apiClient.get<Trip>(`/trips/${tripId}`);
   return data;
 }
 

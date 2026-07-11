@@ -10,6 +10,7 @@ import { CreateTripDto } from './dto/create-trip.dto';
 import { ReorderTripDto } from './dto/reorder-trip.dto';
 import { RegenerateDayDto } from './dto/regenerate-day.dto';
 import { TripDayDto, TripResponseDto } from './dto/trip-response.dto';
+import { TripListItemDto } from './dto/trip-list-item.dto';
 import { ItineraryGeneratorService } from './itinerary-generator.service';
 import {
   ItineraryReorderService,
@@ -67,6 +68,93 @@ export class TripsService {
     );
 
     return this.toResponseDto(trip, days);
+  }
+
+  /**
+   * GET /api/trips (PRD §9 "내 저장 목록(최신순)")
+   * 1) user_id로 본인 소유 trip만 필터링(다른 사용자의 trip은 절대 노출하지 않는다)
+   * 2) updated_at DESC로 정렬(ERD §5 인덱스 제안: 재조정이 일어나면 trip이 갱신되므로,
+   *    최근에 만들었거나 마지막으로 수정한 여행이 목록 위쪽에 오도록 updated_at 기준 채택)
+   * 3) 카드 UI에 필요한 필드만 담은 경량 DTO(TripListItemDto)로 반환하고,
+   *    day/activity 상세는 내려주지 않는다(상세는 GET /trips/{id}에서 별도 조회)
+   * 4) route_warning(flagged)은 관리자 전용이 아니라 사용자 화면에도 즉시 노출해야 하므로
+   *    (CLAUDE.md 핵심 규칙), trip마다 route_warning_flagged=true인 day 수를 집계해 포함한다
+   */
+  async findAll(userId: string): Promise<TripListItemDto[]> {
+    const rows = await this.tripsRepository
+      .createQueryBuilder('trip')
+      .leftJoin('trip.itineraryDays', 'day')
+      .select('trip.id', 'tripId')
+      .addSelect('trip.destination', 'destination')
+      .addSelect('trip.startDate', 'startDate')
+      .addSelect('trip.endDate', 'endDate')
+      .addSelect('trip.durationDays', 'durationDays')
+      .addSelect('trip.preferences', 'preferences')
+      .addSelect('trip.revision', 'revision')
+      .addSelect('trip.createdAt', 'createdAt')
+      .addSelect('trip.updatedAt', 'updatedAt')
+      .addSelect(
+        'COUNT(day.id) FILTER (WHERE day.routeWarningFlagged = true)',
+        'flaggedDaysCount',
+      )
+      .where('trip.userId = :userId', { userId })
+      .groupBy('trip.id')
+      .orderBy('trip.updatedAt', 'DESC')
+      .getRawMany<{
+        tripId: string;
+        destination: string;
+        startDate: string;
+        endDate: string;
+        durationDays: number;
+        preferences: string[];
+        revision: number;
+        createdAt: Date;
+        updatedAt: Date;
+        flaggedDaysCount: string;
+      }>();
+
+    return rows.map((row) => ({
+      trip_id: row.tripId,
+      destination: row.destination,
+      start_date: row.startDate,
+      end_date: row.endDate,
+      duration_days: row.durationDays,
+      preferences: row.preferences,
+      revision: row.revision,
+      flagged_days_count: Number(row.flaggedDaysCount),
+      created_at: new Date(row.createdAt).toISOString(),
+      updated_at: new Date(row.updatedAt).toISOString(),
+    }));
+  }
+
+  /**
+   * GET /api/trips/{trip_id} (PRD §9 "저장된 일정 상세")
+   * 목록 화면 카드 클릭 시 진입. §8.3 스키마 전체(days/activities 포함)를 반환한다.
+   * 소유권 확인은 regenerate()/reorder()와 동일 패턴(404 → 403 순서).
+   */
+  async findOne(tripId: string, userId: string): Promise<TripResponseDto> {
+    const trip = await this.tripsRepository.findOne({
+      where: { id: tripId },
+      relations: { itineraryDays: { activities: true } },
+    });
+
+    if (!trip) {
+      throw new AppException(
+        'NOT_FOUND',
+        '여행 일정을 찾을 수 없습니다.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (trip.userId !== userId) {
+      throw new AppException(
+        'FORBIDDEN',
+        '본인 소유의 일정만 조회할 수 있습니다.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return this.toResponseDto(trip, trip.itineraryDays ?? []);
   }
 
   /**
