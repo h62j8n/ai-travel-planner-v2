@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ItineraryDay } from '../trips/entities/itinerary-day.entity';
@@ -9,8 +9,14 @@ import {
   DestinationStatsPeriod,
   DestinationStatsResponseDto,
 } from './dto/destination-stats.dto';
+import {
+  PromptTemplateDto,
+  UpdatePromptTemplateDto,
+} from './dto/prompt-template.dto';
 import { TripsService } from '../trips/trips.service';
 import { TripResponseDto } from '../trips/dto/trip-response.dto';
+import { PromptTemplate } from './entities/prompt-template.entity';
+import { AppException } from '../common/exceptions/app.exception';
 
 @Injectable()
 export class AdminService {
@@ -19,6 +25,8 @@ export class AdminService {
     private readonly itineraryDaysRepository: Repository<ItineraryDay>,
     @InjectRepository(Trip)
     private readonly tripsRepository: Repository<Trip>,
+    @InjectRepository(PromptTemplate)
+    private readonly promptTemplatesRepository: Repository<PromptTemplate>,
     private readonly tripsService: TripsService,
   ) {}
 
@@ -106,6 +114,77 @@ export class AdminService {
     }));
 
     return { period, items };
+  }
+
+  /**
+   * GET /api/admin/prompt-templates (PRD §6.6/§9, WBS Phase 4.5, ERD §3.6)
+   * 전체 프롬프트 템플릿 목록을 name 오름차순으로 반환한다. 레코드 수가 적은
+   * 소규모 테이블이므로 페이지네이션 없이 전체 조회한다.
+   */
+  async getPromptTemplates(): Promise<PromptTemplateDto[]> {
+    const templates = await this.promptTemplatesRepository.find({
+      order: { name: 'ASC' },
+    });
+
+    return templates.map((template) => PromptTemplateDto.fromEntity(template));
+  }
+
+  /**
+   * GET /api/admin/prompt-templates/{id} (PRD §6.6/§9, WBS Phase 4.5, ERD §3.6)
+   * id로 단건 조회하며, 존재하지 않으면 404 NOT_FOUND로 통일한다
+   * (trips.service.ts의 findTripWithDaysOrThrow와 동일한 패턴).
+   */
+  async getPromptTemplateDetail(id: string): Promise<PromptTemplateDto> {
+    const template = await this.findPromptTemplateOrThrow(id);
+    return PromptTemplateDto.fromEntity(template);
+  }
+
+  /**
+   * PUT /api/admin/prompt-templates/{id} (PRD §6.6/§9, WBS Phase 4.5, ERD §3.6)
+   * name/id/created_at은 수정 불가(URL 경로/DB 값 고정). content가 실제로 변경된
+   * 경우에만 version을 +1 한다(동일 content 재저장 또는 is_active만 변경하는
+   * 경우엔 version을 올리지 않음 — UpdatePromptTemplateDto 주석의 의도된 동작).
+   * ERD §6에 따라 별도의 버전 히스토리 테이블이나 낙관적 락은 도입하지 않으며,
+   * 마지막 저장이 이전 값을 덮어쓴다(동시 편집 충돌은 허용된 트레이드오프).
+   */
+  async updatePromptTemplate(
+    id: string,
+    dto: UpdatePromptTemplateDto,
+  ): Promise<PromptTemplateDto> {
+    const template = await this.findPromptTemplateOrThrow(id);
+
+    const contentChanged = template.content !== dto.content;
+
+    template.content = dto.content;
+    if (contentChanged) {
+      template.version += 1;
+    }
+    if (dto.is_active !== undefined) {
+      template.isActive = dto.is_active;
+    }
+
+    const saved = await this.promptTemplatesRepository.save(template);
+    return PromptTemplateDto.fromEntity(saved);
+  }
+
+  /**
+   * id로 prompt_templates를 조회하고, 없으면 404 NOT_FOUND를 던진다.
+   * getPromptTemplateDetail/updatePromptTemplate 공용.
+   */
+  private async findPromptTemplateOrThrow(id: string): Promise<PromptTemplate> {
+    const template = await this.promptTemplatesRepository.findOne({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new AppException(
+        'NOT_FOUND',
+        '프롬프트 템플릿을 찾을 수 없습니다.',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return template;
   }
 
   /**

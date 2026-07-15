@@ -4,7 +4,13 @@ import type {
   DestinationStatsResponse,
   FlaggedTripDay,
   FlaggedTripDetail,
+  PromptTemplate,
 } from '../types/admin';
+
+/** PUT /admin/prompt-templates/:id 요청 바디. 현재는 content만 수정 가능하다. */
+export interface UpdatePromptTemplateInput {
+  content: string;
+}
 
 /**
  * 관리자 전용 API (WBS 4.3, PRD 6.5, 6.6).
@@ -44,5 +50,29 @@ export async function getDestinationStats(
   const { data } = await apiClient.get<DestinationStatsResponse>('/admin/stats/destinations', {
     params: { period },
   });
+  return data;
+}
+
+/** GET /admin/prompt-templates: 프롬프트 템플릿 목록(name/version/updated_at 등)을 반환한다. */
+export async function getPromptTemplates(): Promise<PromptTemplate[]> {
+  const { data } = await apiClient.get<PromptTemplate[]>('/admin/prompt-templates');
+  return data;
+}
+
+/** GET /admin/prompt-templates/:id: 템플릿 1건의 최신 상세(content 포함)를 반환한다. */
+export async function getPromptTemplateDetail(id: string): Promise<PromptTemplate> {
+  const { data } = await apiClient.get<PromptTemplate>(`/admin/prompt-templates/${id}`);
+  return data;
+}
+
+/**
+ * PUT /admin/prompt-templates/:id:
+ * content를 수정해 저장한다. 응답으로 갱신된 template(반영된 version/updated_at 포함)을 받는다.
+ */
+export async function updatePromptTemplate(
+  id: string,
+  input: UpdatePromptTemplateInput,
+): Promise<PromptTemplate> {
+  const { data } = await apiClient.put<PromptTemplate>(`/admin/prompt-templates/${id}`, input);
   return data;
 }

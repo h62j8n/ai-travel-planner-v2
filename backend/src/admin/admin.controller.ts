@@ -1,6 +1,15 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -18,6 +27,10 @@ import {
   DestinationStatsQueryDto,
   DestinationStatsResponseDto,
 } from './dto/destination-stats.dto';
+import {
+  PromptTemplateDto,
+  UpdatePromptTemplateDto,
+} from './dto/prompt-template.dto';
 import { TripResponseDto } from '../trips/dto/trip-response.dto';
 
 /**
@@ -105,5 +118,67 @@ export class AdminController {
     @Query() query: DestinationStatsQueryDto,
   ): Promise<DestinationStatsResponseDto> {
     return this.adminService.getDestinationStats(query.period);
+  }
+
+  @Get('prompt-templates')
+  @ApiOperation({
+    summary: '프롬프트 템플릿 전체 목록 조회 (PRD §6.6/§9, WBS Phase 4.5)',
+  })
+  @ApiOkResponse({
+    type: PromptTemplateDto,
+    isArray: true,
+    description: 'name 오름차순 정렬된 전체 프롬프트 템플릿 목록',
+  })
+  @ApiResponse({ status: 401, description: 'AUTH_ERROR - 인증 필요' })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN - role=admin이 아닌 사용자의 요청',
+  })
+  getPromptTemplates(): Promise<PromptTemplateDto[]> {
+    return this.adminService.getPromptTemplates();
+  }
+
+  @Get('prompt-templates/:id')
+  @ApiOperation({
+    summary: '프롬프트 템플릿 상세 조회 (PRD §6.6/§9, WBS Phase 4.5)',
+  })
+  @ApiParam({ name: 'id', description: '템플릿 식별자(prompt_templates.id)' })
+  @ApiOkResponse({ type: PromptTemplateDto })
+  @ApiResponse({ status: 401, description: 'AUTH_ERROR - 인증 필요' })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN - role=admin이 아닌 사용자의 요청',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'NOT_FOUND - 존재하지 않는 템플릿 id',
+  })
+  getPromptTemplateDetail(@Param('id') id: string): Promise<PromptTemplateDto> {
+    return this.adminService.getPromptTemplateDetail(id);
+  }
+
+  @Put('prompt-templates/:id')
+  @ApiOperation({
+    summary:
+      '프롬프트 템플릿 수정 (PRD §6.6/§9, WBS Phase 4.5). content 변경 시에만 ' +
+      'version이 자동으로 +1 되며, 낙관적 락은 도입하지 않아 마지막 저장이 이전 값을 덮어쓴다(ERD §6).',
+  })
+  @ApiParam({ name: 'id', description: '템플릿 식별자(prompt_templates.id)' })
+  @ApiBody({ type: UpdatePromptTemplateDto })
+  @ApiOkResponse({ type: PromptTemplateDto })
+  @ApiResponse({ status: 401, description: 'AUTH_ERROR - 인증 필요' })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN - role=admin이 아닌 사용자의 요청',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'NOT_FOUND - 존재하지 않는 템플릿 id',
+  })
+  updatePromptTemplate(
+    @Param('id') id: string,
+    @Body() dto: UpdatePromptTemplateDto,
+  ): Promise<PromptTemplateDto> {
+    return this.adminService.updatePromptTemplate(id, dto);
   }
 }
