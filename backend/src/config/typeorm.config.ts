@@ -15,9 +15,10 @@ export const getTypeOrmConfig = (
   username: configService.get<string>('DB_USERNAME'),
   password: configService.get<string>('DB_PASSWORD'),
   database: configService.get<string>('DB_DATABASE'),
-  ssl: configService.get<string>('DB_SSL', 'true') === 'true'
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl:
+    configService.get<string>('DB_SSL', 'true') === 'true'
+      ? { rejectUnauthorized: false }
+      : false,
   autoLoadEntities: true,
   synchronize: configService.get<string>('DB_SYNCHRONIZE', 'false') === 'true',
 });

@@ -141,7 +141,8 @@ export class TripsService {
       targetDayInput.activities.map((activity) => [activity.id, activity]),
     );
     const reorderedActivities: GeneratedActivity[] = dto.new_activity_order.map(
-      (key) => TripsService.toGeneratedActivityFromInput(activityByKey.get(key)!),
+      (key) =>
+        TripsService.toGeneratedActivityFromInput(activityByKey.get(key)!),
     );
 
     const reorderInput: ReorderDayInput = {
@@ -183,9 +184,7 @@ export class TripsService {
     };
 
     const days = dto.days.map((day) =>
-      day.day === dto.day
-        ? updatedDay
-        : TripsService.toRelayedDayDto(day),
+      day.day === dto.day ? updatedDay : TripsService.toRelayedDayDto(day),
     );
 
     return {
@@ -278,9 +277,7 @@ export class TripsService {
     };
 
     const days = dto.days.map((day) =>
-      day.day === dto.day
-        ? updatedDay
-        : TripsService.toRelayedDayDto(day),
+      day.day === dto.day ? updatedDay : TripsService.toRelayedDayDto(day),
     );
 
     return {
@@ -415,6 +412,37 @@ export class TripsService {
    * 소유권 확인은 regenerate()/reorder()와 동일 패턴(404 → 403 순서).
    */
   async findOne(tripId: string, userId: string): Promise<TripResponseDto> {
+    const trip = await this.findTripWithDaysOrThrow(tripId);
+
+    if (trip.userId !== userId) {
+      throw new AppException(
+        'FORBIDDEN',
+        '본인 소유의 일정만 조회할 수 있습니다.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return this.toResponseDto(trip, trip.itineraryDays ?? []);
+  }
+
+  /**
+   * GET /api/admin/flagged/{trip_id} (PRD §6.5, §6.6, §9)
+   * 관리자 열람 모드 전용 상세 조회. findOne()과 달리 소유권(trip.userId)을 검사하지
+   * 않는다 — 관리자는 어떤 사용자의 trip이든 조회할 수 있어야 하므로(관리자 전용
+   * 인가는 AdminController의 클래스 레벨 JwtAuthGuard+RolesGuard가 이미 담당한다).
+   * 응답 스키마는 사용자용 GET /trips/{trip_id}와 완전히 동일한 TripResponseDto를
+   * 재사용해 프론트가 같은 일정표 UI를 그대로 재사용할 수 있게 한다.
+   */
+  async findOneForAdmin(tripId: string): Promise<TripResponseDto> {
+    const trip = await this.findTripWithDaysOrThrow(tripId);
+    return this.toResponseDto(trip, trip.itineraryDays ?? []);
+  }
+
+  /**
+   * findOne()/findOneForAdmin() 공용: day/activity를 포함해 trip을 로드하고,
+   * 존재하지 않으면 404 NOT_FOUND로 통일한다(소유권 검사는 호출자 책임).
+   */
+  private async findTripWithDaysOrThrow(tripId: string): Promise<Trip> {
     const trip = await this.tripsRepository.findOne({
       where: { id: tripId },
       relations: { itineraryDays: { activities: true } },
@@ -428,15 +456,7 @@ export class TripsService {
       );
     }
 
-    if (trip.userId !== userId) {
-      throw new AppException(
-        'FORBIDDEN',
-        '본인 소유의 일정만 조회할 수 있습니다.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return this.toResponseDto(trip, trip.itineraryDays ?? []);
+    return trip;
   }
 
   /**
@@ -644,7 +664,8 @@ export class TripsService {
       targetDayInput.activities.map((activity) => [activity.id, activity]),
     );
     const reorderedActivities: GeneratedActivity[] = dto.new_activity_order.map(
-      (key) => TripsService.toGeneratedActivityFromInput(activityByKey.get(key)!),
+      (key) =>
+        TripsService.toGeneratedActivityFromInput(activityByKey.get(key)!),
     );
 
     const reorderInput: ReorderDayInput = {

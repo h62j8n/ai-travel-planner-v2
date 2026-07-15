@@ -108,9 +108,7 @@ export class TripsController {
     status: 503,
     description: 'GENERATION_FAILED - AI 생성 실패',
   })
-  generateTemp(
-    @Body() dto: CreateTripDto,
-  ): Promise<TempTripResponseDto> {
+  generateTemp(@Body() dto: CreateTripDto): Promise<TempTripResponseDto> {
     return this.tripsService.generateTemp(dto);
   }
 
@@ -135,9 +133,7 @@ export class TripsController {
     status: 503,
     description: 'GENERATION_FAILED - AI 생성 실패',
   })
-  regenerateTemp(
-    @Body() dto: CreateTripDto,
-  ): Promise<TempTripResponseDto> {
+  regenerateTemp(@Body() dto: CreateTripDto): Promise<TempTripResponseDto> {
     return this.tripsService.regenerateTemp(dto);
   }
 
@@ -163,9 +159,7 @@ export class TripsController {
     status: 503,
     description: 'GENERATION_FAILED - AI 응답 검증 실패',
   })
-  reorderTemp(
-    @Body() dto: ReorderTempDto,
-  ): Promise<TempTripResponseDto> {
+  reorderTemp(@Body() dto: ReorderTempDto): Promise<TempTripResponseDto> {
     return this.tripsService.reorderTemp(dto);
   }
 
@@ -204,7 +198,8 @@ export class TripsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'PRD §9 API 계약대로 200 OK로 응답. §8.3 스키마 반환(revision=1)',
+    description:
+      'PRD §9 API 계약대로 200 OK로 응답. §8.3 스키마 반환(revision=1)',
     type: TripResponseDto,
   })
   @ApiResponse({
@@ -392,7 +387,8 @@ export class TripsController {
   })
   @ApiParam({ name: 'tripId', description: '여행 식별자(trips.id)' })
   @ApiBody({
-    description: '현재 화면에 표시된 최종 일정 전체(days[]). AI를 다시 호출하지 않는다.',
+    description:
+      '현재 화면에 표시된 최종 일정 전체(days[]). AI를 다시 호출하지 않는다.',
     type: SaveTripDaysDto,
   })
   @ApiResponse({

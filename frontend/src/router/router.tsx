@@ -10,6 +10,7 @@ import LoginPage from '../pages/auth/LoginPage';
 import SignupPage from '../pages/auth/SignupPage';
 import AdminLoginPage from '../pages/auth/AdminLoginPage';
 import QualityMonitoringPage from '../pages/admin/QualityMonitoringPage';
+import FlaggedTripDetailPage from '../pages/admin/FlaggedTripDetailPage';
 import DestinationStatsPage from '../pages/admin/DestinationStatsPage';
 import PromptTemplatesPage from '../pages/admin/PromptTemplatesPage';
 import RequireAuth from './RequireAuth';
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/admin/flagged-trips" replace /> },
           { path: 'flagged-trips', element: <QualityMonitoringPage /> },
+          { path: 'flagged/:tripId', element: <FlaggedTripDetailPage /> },
           { path: 'destinations', element: <DestinationStatsPage /> },
           { path: 'prompt-templates', element: <PromptTemplatesPage /> },
         ],

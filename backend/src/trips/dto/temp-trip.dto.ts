@@ -94,7 +94,11 @@ export class TripDayInputDto {
   @Min(1, { message: 'day는 1 이상이어야 합니다.' })
   day: number;
 
-  @ApiProperty({ example: '도착 및 시내 탐방', nullable: true, required: false })
+  @ApiProperty({
+    example: '도착 및 시내 탐방',
+    nullable: true,
+    required: false,
+  })
   @IsOptional()
   @IsString()
   theme: string | null;
@@ -171,7 +175,10 @@ export class ReorderTempDto extends TempAdjustBaseDto {
 
 /** PATCH /api/trips/regenerate-day 요청 바디 (PRD §8.2, §9) */
 export class RegenerateDayTempDto extends TempAdjustBaseDto {
-  @ApiProperty({ example: 2, description: '활동 전체를 새로 생성할 일차(1부터 시작)' })
+  @ApiProperty({
+    example: 2,
+    description: '활동 전체를 새로 생성할 일차(1부터 시작)',
+  })
   @IsInt({ message: 'day는 정수여야 합니다.' })
   @Min(1, { message: 'day는 1 이상이어야 합니다.' })
   day: number;
@@ -223,7 +230,8 @@ export class RegenerateSaveDto {
 
   @ApiProperty({
     type: [TripDayInputDto],
-    description: '전체 재생성 미리보기 응답의 days를 그대로 전달(§8.3 출력 그대로)',
+    description:
+      '전체 재생성 미리보기 응답의 days를 그대로 전달(§8.3 출력 그대로)',
   })
   @IsArray()
   @ArrayNotEmpty({ message: 'days는 최소 1개 이상이어야 합니다.' })
