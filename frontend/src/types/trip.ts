@@ -55,12 +55,43 @@ export interface TripCreateInput {
   preferences: string[];
 }
 
-/** PRD 8.2 재조정 요청 입력 */
+/** PRD 8.2 재조정 요청 입력 (저장 후, trip_id 기반) */
 export interface TripReorderInput {
   trip_id: string;
   day: number;
   new_activity_order: string[];
 }
+
+/**
+ * PRD 8.3 "주의" 문단: 저장 전(임시) 엔드포인트
+ * (POST /trips/generate, /trips/regenerate, PATCH /trips/reorder, /trips/regenerate-day) 응답에는
+ * trip_id/meta.revision이 없다. generated_at만 내려온다.
+ */
+export interface TempTripMeta {
+  generated_at: string;
+}
+
+/**
+ * 저장 전(임시) 응답 스키마. backend TempTripResponseDto와 1:1 대응.
+ * Trip과 달리 trip_id가 없으므로 별도 타입으로 분리한다.
+ */
+export interface TempTrip {
+  destination: string;
+  duration_days: number;
+  summary: string | null;
+  preferences: string[];
+  days: TripDay[];
+  meta: TempTripMeta;
+}
+
+/**
+ * 프론트가 "임시 조정" 화면(예: /trips/draft)에서 들고 있는 현재 상태.
+ * 서버의 임시 조정 엔드포인트(reorder/regenerate-day/regenerate)는 stateless라 아무것도 기억하지
+ * 않으므로, 최초 생성 입력값(TripCreateInput) 전체를 응답의 summary/duration_days/days와 함께
+ * 계속 들고 있다가 매 요청마다 다시 실어 보내야 한다(PRD 8.2).
+ */
+export type DraftTrip = TripCreateInput &
+  Pick<TempTrip, 'summary' | 'duration_days' | 'days'>;
 
 /**
  * GET /trips (PRD 9절 "내 저장 목록(최신순)") 응답 아이템.

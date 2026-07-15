@@ -26,7 +26,7 @@ import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 
-import { createTrip } from '../api/tripApi';
+import { generateTrip } from '../api/tripApi';
 import { extractErrorMessage } from '../api/authApi';
 import {
   COMPANION_OPTIONS,
@@ -34,6 +34,7 @@ import {
   tripCreateSchema,
   type TripCreateFormValues,
 } from '../trips/tripSchemas';
+import type { DraftTrip } from '../types/trip';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const TIME_FORMAT = 'HH:mm';
@@ -41,7 +42,9 @@ const TIME_FORMAT = 'HH:mm';
 /**
  * 일정 생성 폼 (사용자)
  * PRD 6.2, 8.1, 11절 / docs/wireframe/일정생성폼_와이어프레임.html 참고
- * 제출 시 POST /api/trips 호출 -> 응답 trip_id로 /trips/{trip_id} 이동 (PRD 9절).
+ * 제출 시 POST /api/trips/generate 호출 -> 응답(TempTrip, trip_id 없음)은 아직 DB에 저장되지
+ * 않은 임시 일정이다. 이후 조정/저장 과정에서 서버가 stateless라 입력값을 계속 기억할 수 없으므로,
+ * 폼 입력값(values)과 AI 응답을 합친 DraftTrip을 만들어 /trips/draft로 함께 들고 이동한다(PRD 6.2.1).
  */
 function TripCreatePage() {
   const navigate = useNavigate();
@@ -74,8 +77,14 @@ function TripCreatePage() {
   const onSubmit = async (values: TripCreateFormValues) => {
     setSubmitError(null);
     try {
-      const trip = await createTrip(values);
-      navigate(`/trips/${trip.trip_id}`, { state: { trip } });
+      const tempTrip = await generateTrip(values);
+      const draft: DraftTrip = {
+        ...values,
+        summary: tempTrip.summary,
+        duration_days: tempTrip.duration_days,
+        days: tempTrip.days,
+      };
+      navigate('/trips/draft', { state: { draft } });
     } catch (error) {
       setSubmitError(
         extractErrorMessage(

@@ -111,3 +111,38 @@ export class TripResponseDto {
   @ApiProperty({ type: TripMetaDto })
   meta: TripMetaDto;
 }
+
+/**
+ * PRD §8.3 "주의" 문단: 임시(저장 전) 엔드포인트(POST /trips/generate·regenerate,
+ * PATCH /trips/reorder·regenerate-day) 응답은 §8.3 스키마에서 trip_id와
+ * meta.revision이 빠진 형태다. DB에 저장하지 않으므로 식별자/재조정 카운트 자체가
+ * 존재하지 않는다.
+ */
+export class TempTripMetaDto {
+  @ApiProperty({ example: '2026-07-10T10:00:00.000Z' })
+  generated_at: string;
+}
+
+export class TempTripResponseDto {
+  @ApiProperty({ example: '부산' })
+  destination: string;
+
+  @ApiProperty({ example: 3 })
+  duration_days: number;
+
+  @ApiProperty({ example: '부산 2박 3일 힐링+먹방 일정', nullable: true })
+  summary: string | null;
+
+  @ApiProperty({
+    example: ['힐링', '먹방'],
+    type: [String],
+    description: '여행 생성 시 선택한 취향 목록',
+  })
+  preferences: string[];
+
+  @ApiProperty({ type: [TripDayDto] })
+  days: TripDayDto[];
+
+  @ApiProperty({ type: TempTripMetaDto })
+  meta: TempTripMetaDto;
+}

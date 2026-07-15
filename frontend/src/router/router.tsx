@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
 import AdminLayout from '../components/layout/AdminLayout';
 import TripCreatePage from '../pages/TripCreatePage';
+import TripDraftPage from '../pages/TripDraftPage';
 import TripItineraryPage from '../pages/TripItineraryPage';
 import SavedTripsPage from '../pages/SavedTripsPage';
 import LoginPage from '../pages/auth/LoginPage';
@@ -34,6 +35,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/trips/new" replace /> },
           { path: 'trips/new', element: <TripCreatePage /> },
+          { path: 'trips/draft', element: <TripDraftPage /> },
           { path: 'trips', element: <SavedTripsPage /> },
           { path: 'trips/:tripId', element: <TripItineraryPage /> },
         ],
