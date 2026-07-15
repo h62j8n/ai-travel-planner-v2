@@ -20,9 +20,21 @@ export interface FlaggedTripDay {
  */
 export type FlaggedTripDetail = Trip;
 
-export interface DestinationStat {
+/** GET /admin/stats/destinations 쿼리 파라미터 `period`. 기본값은 'all'. */
+export type DestinationStatsPeriod = 'all' | 'month' | 'week';
+
+/** GET /admin/stats/destinations 응답의 items[] 원소 1건. */
+export interface DestinationStatItem {
+  rank: number;
   destination: string;
-  trip_count: number;
+  count: number;
+  lastCreatedAt: string;
+}
+
+/** GET /admin/stats/destinations 응답 스키마 (frontend-developer/backend-developer 계약). */
+export interface DestinationStatsResponse {
+  period: DestinationStatsPeriod;
+  items: DestinationStatItem[];
 }
 
 export interface PromptTemplate {

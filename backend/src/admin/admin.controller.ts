@@ -1,9 +1,10 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -12,6 +13,11 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminService } from './admin.service';
 import { FlaggedTripDto } from './dto/flagged-trip.dto';
+import {
+  DESTINATION_STATS_PERIODS,
+  DestinationStatsQueryDto,
+  DestinationStatsResponseDto,
+} from './dto/destination-stats.dto';
 import { TripResponseDto } from '../trips/dto/trip-response.dto';
 
 /**
@@ -66,5 +72,38 @@ export class AdminController {
     @Param('tripId') tripId: string,
   ): Promise<TripResponseDto> {
     return this.adminService.getFlaggedTripDetail(tripId);
+  }
+
+  @Get('stats/destinations')
+  @ApiOperation({
+    summary:
+      '인기 목적지 통계 (trips.destination GROUP BY, PRD §6.6/§9, WBS Phase 4.4)',
+  })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: DESTINATION_STATS_PERIODS,
+    description:
+      'all(기본값)=전체 기간, month=이번 달(캘린더 월 기준), week=최근 7일. trips.created_at 기준 필터',
+  })
+  @ApiOkResponse({
+    type: DestinationStatsResponseDto,
+    description:
+      'destination별 생성 건수 내림차순(동률 시 destination 오름차순) 정렬. ' +
+      'rank는 정렬 순서대로 1부터 부여, lastCreatedAt은 해당 destination의 최근 생성일(MAX(created_at))',
+  })
+  @ApiResponse({ status: 401, description: 'AUTH_ERROR - 인증 필요' })
+  @ApiResponse({
+    status: 403,
+    description: 'FORBIDDEN - role=admin이 아닌 사용자의 요청',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'VALIDATION_ERROR - period가 all/month/week 중 하나가 아님',
+  })
+  getDestinationStats(
+    @Query() query: DestinationStatsQueryDto,
+  ): Promise<DestinationStatsResponseDto> {
+    return this.adminService.getDestinationStats(query.period);
   }
 }

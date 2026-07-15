@@ -2,7 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ItineraryDay } from '../trips/entities/itinerary-day.entity';
+import { Trip } from '../trips/entities/trip.entity';
 import { FlaggedTripDto } from './dto/flagged-trip.dto';
+import {
+  DestinationStatItemDto,
+  DestinationStatsPeriod,
+  DestinationStatsResponseDto,
+} from './dto/destination-stats.dto';
 import { TripsService } from '../trips/trips.service';
 import { TripResponseDto } from '../trips/dto/trip-response.dto';
 
@@ -11,6 +17,8 @@ export class AdminService {
   constructor(
     @InjectRepository(ItineraryDay)
     private readonly itineraryDaysRepository: Repository<ItineraryDay>,
+    @InjectRepository(Trip)
+    private readonly tripsRepository: Repository<Trip>,
     private readonly tripsService: TripsService,
   ) {}
 
@@ -57,5 +65,69 @@ export class AdminService {
    */
   async getFlaggedTripDetail(tripId: string): Promise<TripResponseDto> {
     return this.tripsService.findOneForAdmin(tripId);
+  }
+
+  /**
+   * GET /api/admin/stats/destinations (PRD §6.6, §9 / WBS Phase 4.4)
+   * trips.destination 기준 GROUP BY 집계(ERD §5 "trips(destination) — 관리자 인기
+   * 목적지 통계용 GROUP BY 성능" 인덱스 활용). ai_response_cache와 무관한 단순 통계
+   * 조회이므로 캐싱을 적용하지 않는다. period 필터는 trips.created_at 기준.
+   */
+  async getDestinationStats(
+    period: DestinationStatsPeriod = 'all',
+  ): Promise<DestinationStatsResponseDto> {
+    const from = this.resolvePeriodStart(period);
+
+    const qb = this.tripsRepository
+      .createQueryBuilder('trip')
+      .select('trip.destination', 'destination')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('MAX(trip.createdAt)', 'lastCreatedAt')
+      .groupBy('trip.destination')
+      .orderBy('COUNT(*)', 'DESC')
+      // tie-break: 동일 생성 건수인 경우 destination 오름차순으로 안정 정렬
+      .addOrderBy('trip.destination', 'ASC');
+
+    if (from) {
+      qb.where('trip.createdAt >= :from', { from });
+    }
+
+    const rows = await qb.getRawMany<{
+      destination: string;
+      count: string;
+      lastCreatedAt: Date;
+    }>();
+
+    const items: DestinationStatItemDto[] = rows.map((row, index) => ({
+      rank: index + 1,
+      destination: row.destination,
+      count: Number(row.count),
+      lastCreatedAt: new Date(row.lastCreatedAt).toISOString(),
+    }));
+
+    return { period, items };
+  }
+
+  /**
+   * period 필터 시작 시각을 계산한다. 서버(UTC) 기준으로 결정한다.
+   * - all: 필터 없음(null)
+   * - week: 현재 시각으로부터 최근 7일(rolling 7 days)
+   * - month: 이번 달 1일 00:00:00 UTC(캘린더 월 기준)
+   */
+  private resolvePeriodStart(period: DestinationStatsPeriod): Date | null {
+    if (period === 'all') {
+      return null;
+    }
+
+    const now = new Date();
+
+    if (period === 'week') {
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    // month
+    return new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
   }
 }
