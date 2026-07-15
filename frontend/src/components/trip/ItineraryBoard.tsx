@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Alert, Backdrop, Box, Chip, CircularProgress, Grid, Paper, Stack, Typography } from '@mui/material';
+import { Backdrop, Box, Chip, CircularProgress, Grid, Paper, Stack, Typography } from '@mui/material';
 
 import DayCard from './DayCard';
 import type { Activity, TripDay } from '../../types/trip';
@@ -16,7 +16,6 @@ interface ItineraryBoardProps {
   extraTitleBadge?: ReactNode;
   /** 헤더 우측 액션 버튼 영역(전체 재생성/저장/목록으로 등) — 페이지별로 다르므로 그대로 주입받는다. */
   headerActions: ReactNode;
-  pendingDays: ReadonlySet<number>;
   /**
    * 미리보기 API(reorder/regenerate-day)가 성공해 로컬에 반영됐지만 아직 "저장" 버튼을
    * 누르지 않은 day 집합. last_modified(서버가 이번 응답에서 재계산한 day)와는 다른 개념이므로
@@ -24,7 +23,10 @@ interface ItineraryBoardProps {
    */
   unsavedDays?: ReadonlySet<number>;
   reorderingDay: number | null;
-  onReorder: (dayNumber: number, activities: Activity[]) => void;
+  /**
+   * 같은 day 내 드래그로 순서를 바꾸는 즉시(드롭 시점) 또는 "동선 최적화 재요청" 버튼 클릭 시
+   * 호출 — 실제 PATCH 재조정 요청을 트리거한다(별도 확인 버튼 없이 바로 서버에 반영 시도).
+   */
   onRequestReorder: (dayNumber: number, activities: Activity[]) => void;
   regeneratingDay: number | null;
   onRequestRegenerateDay: (dayNumber: number) => void;
@@ -37,7 +39,7 @@ interface ItineraryBoardProps {
 
 /**
  * 일정표 화면(임시 draft 모드 / 저장된 trip 모드)이 공유하는 프레젠테이션 레이어.
- * - 헤더(목적지/기간/요약/취향/액션 버튼), pendingDays 안내, day별 카드 그리드, 로딩 백드롭을 담당한다.
+ * - 헤더(목적지/기간/요약/취향/액션 버튼), day별 카드 그리드, 로딩 백드롭을 담당한다.
  * - API 호출/상태 관리/다이얼로그/토스트는 각 페이지(TripDraftPage, TripItineraryPage)가 소유하고
  *   이 컴포넌트에는 순수하게 데이터와 콜백만 내려준다(DayCard와 동일한 설계 원칙).
  */
@@ -50,10 +52,8 @@ function ItineraryBoard({
   revisionLabel,
   extraTitleBadge,
   headerActions,
-  pendingDays,
   unsavedDays,
   reorderingDay,
-  onReorder,
   onRequestReorder,
   regeneratingDay,
   onRequestRegenerateDay,
@@ -102,20 +102,12 @@ function ItineraryBoard({
         </Stack>
       </Paper>
 
-      {pendingDays.size > 0 && (
-        <Alert severity="info">
-          순서를 변경한 날짜가 있어요. 각 카드의 "재조정 요청" 버튼을 눌러 AI에게 반영해 주세요.
-        </Alert>
-      )}
-
       <Grid container spacing={2}>
         {days.map((day) => (
           <Grid key={day.day} size={{ xs: 12, md: 6, lg: 4 }}>
             <DayCard
               day={day}
-              pending={pendingDays.has(day.day)}
               unsaved={unsavedDays?.has(day.day) ?? false}
-              onReorder={onReorder}
               onRequestReorder={onRequestReorder}
               isReordering={reorderingDay === day.day}
               onRequestRegenerateDay={onRequestRegenerateDay}

@@ -41,17 +41,16 @@ import SortableActivityItem, { ActivityCard } from './SortableActivityItem';
 
 interface DayCardProps {
   day: TripDay;
-  /** 드래그로 순서를 바꿨지만 아직 재조정 요청을 보내지 않은 상태인지 여부. */
-  pending: boolean;
   /**
    * 미리보기 API(reorder/regenerate-day)가 성공해 로컬에는 반영됐지만 아직 "저장" 버튼을
    * 누르지 않은 상태인지 여부. last_modified(서버가 이번 응답에서 재계산했다는 뜻)와는 다른
    * 개념 — "커밋 대기 중"을 의미한다.
    */
   unsaved?: boolean;
-  /** 같은 day 내 드래그로 로컬 순서만 바꿀 때 호출 (아직 서버에 반영되지 않음). */
-  onReorder: (dayNumber: number, activities: Activity[]) => void;
-  /** "재조정 요청"/"동선 최적화 재요청" 버튼 클릭 시 호출 — 실제 PATCH 재조정 요청을 트리거한다. */
+  /**
+   * 같은 day 내 드래그로 순서를 바꾸는 즉시(드롭 시점) 호출 — 별도 확인 버튼 없이 바로 실제
+   * PATCH 재조정 요청을 트리거한다. "동선 최적화 재요청" 버튼 클릭 시에도 동일하게 호출된다.
+   */
   onRequestReorder: (dayNumber: number, activities: Activity[]) => void;
   /** 이 day에 대한 재조정 요청이 진행 중인지 여부 (버튼 비활성화 + 로딩 표시용). */
   isReordering: boolean;
@@ -67,13 +66,11 @@ interface DayCardProps {
  * 일자별 카드.
  * - route_warning.flagged=true여도 활동 순서는 사용자가 정한 그대로 유지한다 (자동 재배열 금지).
  * - 드래그는 이 카드가 소유한 DndContext/SortableContext 안에서만 동작하므로 다른 day에는 영향이 없다.
- * - 드래그 자체는 로컬 상태만 바꾸고, 실제 서버 재조정 요청은 버튼 클릭 시에만 발생한다.
+ * - 드래그를 놓는 즉시 onRequestReorder를 호출해 실제 서버 재조정 요청을 보낸다(별도 확인 버튼 없음).
  */
 function DayCard({
   day,
-  pending,
   unsaved = false,
-  onReorder,
   onRequestReorder,
   isReordering,
   onRequestRegenerateDay,
@@ -94,6 +91,8 @@ function DayCard({
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
+    if (isReordering || disableActions) return;
+
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -101,7 +100,7 @@ function DayCard({
     const newIndex = day.activities.findIndex((activity) => activity.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    onReorder(day.day, arrayMove(day.activities, oldIndex, newIndex));
+    onRequestReorder(day.day, arrayMove(day.activities, oldIndex, newIndex));
   };
 
   const handleDragCancel = () => {
@@ -113,14 +112,7 @@ function DayCard({
     : undefined;
 
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        height: '100%',
-        borderColor: pending ? 'secondary.main' : 'divider',
-        borderWidth: pending ? 2 : 1,
-      }}
-    >
+    <Card variant="outlined" sx={{ height: '100%' }}>
       <CardContent>
         <Stack
           direction="row"
@@ -141,9 +133,6 @@ function DayCard({
             )}
             {unsaved && (
               <Chip label="저장 안 됨" color="warning" size="small" variant="outlined" />
-            )}
-            {pending && (
-              <Chip label="순서 변경 대기" color="secondary" size="small" variant="outlined" />
             )}
           </Stack>
         </Stack>
@@ -178,20 +167,6 @@ function DayCard({
         </DndContext>
 
         <Stack spacing={1} sx={{ mt: 2 }}>
-          {pending && (
-            <Button
-              variant="contained"
-              color="secondary"
-              size="small"
-              fullWidth
-              disabled={isReordering || disableActions}
-              startIcon={isReordering ? <CircularProgress size={16} color="inherit" /> : undefined}
-              onClick={() => onRequestReorder(day.day, day.activities)}
-            >
-              재조정 요청
-            </Button>
-          )}
-
           {day.route_warning.flagged && (
             <Button
               variant="outlined"

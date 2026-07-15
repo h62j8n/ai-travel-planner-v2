@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import SaveIcon from '@mui/icons-material/Save';
@@ -14,7 +14,6 @@ import {
   DialogTitle,
   Snackbar,
   Stack,
-  Typography,
 } from '@mui/material';
 
 import { extractErrorMessage } from '../api/authApi';
@@ -76,7 +75,6 @@ function TripDraftPage() {
   const initialDraft = (location.state as DraftLocationState | null)?.draft;
 
   const [draft, setDraft] = useState<DraftTrip | undefined>(initialDraft);
-  const [pendingDays, setPendingDays] = useState<ReadonlySet<number>>(new Set());
   const [reorderingDay, setReorderingDay] = useState<number | null>(null);
   const [regeneratingDay, setRegeneratingDay] = useState<number | null>(null);
   const [regeneratingTrip, setRegeneratingTrip] = useState(false);
@@ -84,38 +82,24 @@ function TripDraftPage() {
   const [regenerateTripDialogOpen, setRegenerateTripDialogOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  // 새로고침/직접 URL 접근 등으로 navigate state의 draft가 없으면(임시 일정은 저장 전이라
+  // 서버에 남아있지 않음) 안내 화면 없이 바로 새 일정 만들기로 이동한다.
+  useEffect(() => {
+    if (!draft) {
+      navigate('/trips/new', { replace: true });
+    }
+  }, [draft, navigate]);
+
   if (!draft) {
     return (
-      <Stack spacing={2} sx={{ maxWidth: 480, mx: 'auto', textAlign: 'center', mt: 6 }}>
-        <Typography variant="h6">임시 일정 정보를 찾을 수 없습니다</Typography>
-        <Typography variant="body2" color="text.secondary">
-          새로고침했거나 잘못된 경로로 접근한 경우 임시 일정은 저장 전이라 데이터가 남아있지
-          않아요. 새 일정을 만들어 주세요.
-        </Typography>
-        <Button variant="contained" color="secondary" onClick={() => navigate('/trips/new')}>
-          새 일정 만들기로 이동
-        </Button>
+      <Stack spacing={2} sx={{ alignItems: 'center', mt: 6 }}>
+        <CircularProgress size={32} />
       </Stack>
     );
   }
 
-  // route_warning.flagged=true인 day가 있어도 활동 순서는 사용자가 정한 그대로 유지한다 (자동 재배열 금지).
-  const handleReorder = (dayNumber: number, activities: Activity[]) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        days: prev.days.map((day) => (day.day === dayNumber ? { ...day, activities } : day)),
-      };
-    });
-    setPendingDays((prev) => {
-      const next = new Set(prev);
-      next.add(dayNumber);
-      return next;
-    });
-  };
-
-  // "재조정 요청" / "동선 최적화 재요청" 버튼 클릭 시에만 서버로 PATCH를 보낸다(임시, DB 저장 X).
+  // 드래그로 순서를 바꾸는 즉시(별도 확인 버튼 없이) 서버로 PATCH를 보낸다(임시, DB 저장 X).
+  // "동선 최적화 재요청" 버튼 클릭 시에도 동일하게 호출된다.
   // 응답(TempTrip)에는 입력값 필드가 없으므로 summary/duration_days/days만 갱신하고, 나머지
   // 입력값(destination/기간/예산 등)은 로컬에 유지한다.
   const handleRequestReorder = async (dayNumber: number, activities: Activity[]) => {
@@ -138,11 +122,6 @@ function TripDraftPage() {
           ? { ...prev, summary: response.summary, duration_days: response.duration_days, days: response.days }
           : prev,
       );
-      setPendingDays((prev) => {
-        const next = new Set(prev);
-        next.delete(dayNumber);
-        return next;
-      });
       setToast({ message: `Day ${dayNumber} 재조정 완료 (임시, 아직 저장되지 않음)`, severity: 'success' });
     } catch (error) {
       setToast({
@@ -172,12 +151,6 @@ function TripDraftPage() {
           ? { ...prev, summary: response.summary, duration_days: response.duration_days, days: response.days }
           : prev,
       );
-      setPendingDays((prev) => {
-        if (!prev.has(dayNumber)) return prev;
-        const next = new Set(prev);
-        next.delete(dayNumber);
-        return next;
-      });
       setToast({
         message: `Day ${dayNumber} 활동을 새로 생성했어요 (임시, 아직 저장되지 않음)`,
         severity: 'success',
@@ -209,7 +182,6 @@ function TripDraftPage() {
           ? { ...prev, summary: response.summary, duration_days: response.duration_days, days: response.days }
           : prev,
       );
-      setPendingDays(new Set());
       setToast({ message: '새로운 임시 일정을 생성했어요 (아직 저장되지 않음)', severity: 'success' });
     } catch (error) {
       setToast({
@@ -254,9 +226,7 @@ function TripDraftPage() {
         preferences={draft.preferences}
         days={draft.days}
         extraTitleBadge={<Chip label="임시 (저장 전)" size="small" color="warning" variant="outlined" />}
-        pendingDays={pendingDays}
         reorderingDay={reorderingDay}
-        onReorder={handleReorder}
         onRequestReorder={handleRequestReorder}
         regeneratingDay={regeneratingDay}
         onRequestRegenerateDay={handleRequestRegenerateDay}

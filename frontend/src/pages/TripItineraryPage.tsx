@@ -54,7 +54,8 @@ interface ToastState {
  * 저장 목록 카드 클릭이나 새로고침/직접 URL 접근처럼 state가 없는 경우에는
  * GET /trips/:id로 상세를 조회한다. 조회 실패(404/403 등)면 안내 화면을 보여준다.
  *
- * 드래그는 로컬 상태만 바꾸고, 실제 AI 호출(미리보기)은 day별 버튼 클릭 시에만 호출한다(비용/UX상 명시적 트리거).
+ * 같은 day 내 드래그로 순서를 바꾸면 드롭 시점에 바로 재조정(reorder) 미리보기 API를 호출한다
+ * (별도 확인 버튼 없음). "동선 최적화 재요청" 버튼도 동일한 핸들러를 사용한다.
  */
 function TripItineraryPage() {
   const location = useLocation();
@@ -70,8 +71,6 @@ function TripItineraryPage() {
   const [summary, setSummary] = useState<string | null | undefined>(initialTrip?.summary);
   const [loadingTrip, setLoadingTrip] = useState(!initialTrip);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // 드래그했지만 아직 "재조정 요청" 버튼을 누르지 않은 day (AI 미호출 상태).
-  const [pendingDays, setPendingDays] = useState<ReadonlySet<number>>(new Set());
   // reorder/regenerate-day 미리보기가 성공해 로컬에 반영됐지만 아직 "저장"을 누르지 않은 day.
   const [unsavedDays, setUnsavedDays] = useState<ReadonlySet<number>>(new Set());
   // "전체 재생성" 미리보기가 현재 화면에 떠 있는 상태인지(true면 저장 시 항상 새 trip_id로 커밋).
@@ -115,6 +114,38 @@ function TripItineraryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId]);
 
+  // 로딩이 끝났는데도 trip/days가 없으면(GET 실패 404/403 등, 혹은 애초에 state/tripId가 없는 경우)
+  // 안내 화면 없이 새 일정 만들기로 이동한다. 다만 조용히 사라지는 것보다는 나으므로, 실패 사유를
+  // Snackbar로 잠깐 보여준 다음 이동한다.
+  useEffect(() => {
+    if (loadingTrip || (trip && days)) {
+      return;
+    }
+    setToast({
+      message: loadError ?? '일정 정보를 찾을 수 없습니다. 새 일정을 만들어 주세요.',
+      severity: 'error',
+    });
+    const timer = setTimeout(() => {
+      navigate('/trips/new', { replace: true });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [loadingTrip, trip, days, loadError, navigate]);
+
+  const toastSnackbar = (
+    <Snackbar
+      open={toast !== null}
+      autoHideDuration={4000}
+      onClose={() => setToast(null)}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      {toast ? (
+        <Alert severity={toast.severity} onClose={() => setToast(null)} sx={{ width: '100%' }}>
+          {toast.message}
+        </Alert>
+      ) : undefined}
+    </Snackbar>
+  );
+
   if (loadingTrip) {
     return (
       <Stack spacing={2} sx={{ alignItems: 'center', mt: 6 }}>
@@ -128,35 +159,21 @@ function TripItineraryPage() {
 
   if (!trip || !days) {
     return (
-      <Stack spacing={2} sx={{ maxWidth: 480, mx: 'auto', textAlign: 'center', mt: 6 }}>
-        <Typography variant="h6">일정 정보를 찾을 수 없습니다</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {loadError ??
-            '새로고침했거나 잘못된 경로로 접근한 경우 일정 데이터가 남아있지 않아요. 새 일정을 만들어 주세요.'}
-        </Typography>
-        <Button variant="contained" color="secondary" onClick={() => navigate('/trips/new')}>
-          새 일정 만들기로 이동
-        </Button>
-      </Stack>
+      <>
+        <Stack spacing={2} sx={{ alignItems: 'center', mt: 6 }}>
+          <CircularProgress size={32} />
+        </Stack>
+        {toastSnackbar}
+      </>
     );
   }
 
   // route_warning.flagged=true인 day가 있어도 활동 순서는 사용자가 정한 그대로 유지한다 (자동 재배열 금지).
-  // 드래그로 순서를 바꾸면 해당 day의 activities만 교체하고, 다른 day는 절대 건드리지 않는다.
-  const handleReorder = (dayNumber: number, activities: Activity[]) => {
-    setDays((prev) =>
-      prev?.map((day) => (day.day === dayNumber ? { ...day, activities } : day)),
-    );
-    setPendingDays((prev) => {
-      const next = new Set(prev);
-      next.add(dayNumber);
-      return next;
-    });
-  };
-
-  // "재조정 요청" / "동선 최적화 재요청" 버튼 클릭 시에만 서버로 PATCH를 보낸다(미리보기, DB 미반영).
-  // 변경 요청한 day와 new_activity_order, 현재 화면의 로컬 days 전체를 함께 보내고,
-  // 응답으로 받은 days 전체(대상 day만 재계산, 나머지는 relay된 것)를 그대로 신뢰해 교체한다.
+  // 드래그로 순서를 바꾸는 즉시(드롭 시점, 별도 확인 버튼 없이) 해당 day의 activities만 서버에
+  // 반영을 요청하고, 다른 day는 절대 건드리지 않는다.
+  // "동선 최적화 재요청" 버튼 클릭 시에도 동일하게 호출된다. 변경 요청한 day와 new_activity_order,
+  // 현재 화면의 로컬 days 전체를 함께 보내고, 응답으로 받은 days 전체(대상 day만 재계산, 나머지는
+  // relay된 것)를 그대로 신뢰해 교체한다.
   const handleRequestReorder = async (dayNumber: number, activities: Activity[]) => {
     if (!trip || !days) return;
 
@@ -168,11 +185,6 @@ function TripItineraryPage() {
       );
       const previewTrip = await reorderTrip(trip.trip_id, dayNumber, newActivityOrder, currentDays);
       setDays(previewTrip.days);
-      setPendingDays((prev) => {
-        const next = new Set(prev);
-        next.delete(dayNumber);
-        return next;
-      });
       setUnsavedDays((prev) => {
         const next = new Set(prev);
         next.add(dayNumber);
@@ -183,7 +195,6 @@ function TripItineraryPage() {
         severity: 'success',
       });
     } catch (error) {
-      // 실패 시 pendingDays는 그대로 유지해 재시도할 수 있게 한다.
       setToast({
         message: extractErrorMessage(
           error,
@@ -206,12 +217,6 @@ function TripItineraryPage() {
     try {
       const previewTrip = await regenerateDayActivities(trip.trip_id, dayNumber, days);
       setDays(previewTrip.days);
-      setPendingDays((prev) => {
-        if (!prev.has(dayNumber)) return prev;
-        const next = new Set(prev);
-        next.delete(dayNumber);
-        return next;
-      });
       setUnsavedDays((prev) => {
         const next = new Set(prev);
         next.add(dayNumber);
@@ -238,7 +243,7 @@ function TripItineraryPage() {
   // 입력 조건은 서버가 원본 trip 기준으로 유지하고 AI만 새로 호출하며(캐시 무시),
   // 응답은 trip_id가 없는 TempTrip(미리보기)이다. DB에는 반영되지 않으므로 페이지 이동 없이
   // 로컬 days/summary를 통째로 교체하고, day 단위 미리보기 상태는 모두 초기화한다
-  // (전체가 새로 교체됐으므로 이전 day별 unsaved/pending 상태는 의미가 없어진다).
+  // (전체가 새로 교체됐으므로 이전 day별 unsaved 상태는 의미가 없어진다).
   const handleRegenerateTrip = async () => {
     if (!trip) return;
 
@@ -248,7 +253,6 @@ function TripItineraryPage() {
       setDays(previewTrip.days);
       setSummary(previewTrip.summary);
       setPendingFullRegenerate(true);
-      setPendingDays(new Set());
       setUnsavedDays(new Set());
       setToast({
         message: '새로운 일정 미리보기가 준비됐어요. "저장"을 누르면 새 일정으로 저장됩니다.',
@@ -311,10 +315,8 @@ function TripItineraryPage() {
         preferences={trip.preferences}
         days={days}
         revisionLabel={`revision ${trip.meta.revision}`}
-        pendingDays={pendingDays}
         unsavedDays={unsavedDays}
         reorderingDay={reorderingDay}
-        onReorder={handleReorder}
         onRequestReorder={handleRequestReorder}
         regeneratingDay={regeneratingDay}
         onRequestRegenerateDay={handleRequestRegenerateDay}
@@ -395,18 +397,7 @@ function TripItineraryPage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={4000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {toast ? (
-          <Alert severity={toast.severity} onClose={() => setToast(null)} sx={{ width: '100%' }}>
-            {toast.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+      {toastSnackbar}
     </>
   );
 }
